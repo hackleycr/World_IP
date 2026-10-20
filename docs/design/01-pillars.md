@@ -1,6 +1,23 @@
 # Design Pillars — First Pass
 
-Status: draft for discussion. Nothing here is settled except the three pillars themselves.
+Status: draft for discussion. See the decision log (section 0) for what has been settled.
+
+## 0. Decision log
+
+| # | Topic | Decision |
+|---|---|---|
+| D1 | What counts as effort | Reward thinking above effort, but effort always counts for something. |
+| D2 | Randomized-rules mode | Add a mode where each world's rule constants are randomized, so players have to learn reality from the ground up every time. See [02-ruleset-mvp.md](02-ruleset-mvp.md#5-randomized-rules-mode). |
+| D3 | Balance | Balance is a hard requirement. The conserved-quantity foundation (section 4) is the main tool for it, backed by measurement in the prototype. |
+| D4 | Conserved-quantity foundation | Accepted as a working idea; revisit after prototyping. |
+| D5 | Scope | Treat everything outside the core gameplay loop as an MVP placeholder, then iterate. |
+| D6 | Research | Research the gameplay loops of popular games to quantify what players enjoy and what brings them back. See [../research/01-gameplay-loops.md](../research/01-gameplay-loops.md). |
+| D7 | Perspective | 2D. |
+| D8 | Setting | A basic natural-science world first; other domains can be added later. |
+| D9 | How created actions are recorded | Recipes, to start with. |
+| D10 | Goal | Deferred; leave it as an MVP placeholder for now. |
+| D11 | Consequences | Actions have permanent consequences: the world can be damaged. |
+| D12 | Team, engine, platform | Deferred until more research is done. |
 
 ## 1. The pillars, as stated
 
