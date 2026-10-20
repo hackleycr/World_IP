@@ -1,0 +1,28 @@
+threshold,method,theme,gold_positives,tp,fp,fn,precision,recall,f1
+0.5,codebook,grind_repetition,15,10,1,5,0.91,0.67,0.77
+0.5,codebook,progress_loss_devaluation,4,0,0,4,,0.0,0.0
+0.5,codebook,discovery_curiosity,12,7,4,5,0.64,0.58,0.61
+0.5,codebook,learning_curve_opacity,10,5,1,5,0.83,0.5,0.62
+0.5,codebook,creativity_building,6,4,0,2,1.0,0.67,0.8
+0.5,codebook,emergence_simulation,2,1,0,1,1.0,0.5,0.67
+0.5,codebook,permanence_consequence,3,1,0,2,1.0,0.33,0.5
+0.5,codebook,content_exhaustion,5,1,0,4,1.0,0.2,0.33
+0.5,codebook,ALL (micro),57,29,6,28,0.83,0.51,0.63
+0.5,semantic,grind_repetition,15,6,4,9,0.6,0.4,0.48
+0.5,semantic,progress_loss_devaluation,4,0,0,4,,0.0,0.0
+0.5,semantic,discovery_curiosity,12,3,0,9,1.0,0.25,0.4
+0.5,semantic,learning_curve_opacity,10,5,2,5,0.71,0.5,0.59
+0.5,semantic,creativity_building,6,0,0,6,,0.0,0.0
+0.5,semantic,emergence_simulation,2,1,0,1,1.0,0.5,0.67
+0.5,semantic,permanence_consequence,3,1,0,2,1.0,0.33,0.5
+0.5,semantic,content_exhaustion,5,2,5,3,0.29,0.4,0.33
+0.5,semantic,ALL (micro),57,18,11,39,0.62,0.32,0.42
+0.5,union,grind_repetition,15,10,5,5,0.67,0.67,0.67
+0.5,union,progress_loss_devaluation,4,0,0,4,,0.0,0.0
+0.5,union,discovery_curiosity,12,8,4,4,0.67,0.67,0.67
+0.5,union,learning_curve_opacity,10,7,3,3,0.7,0.7,0.7
+0.5,union,creativity_building,6,4,0,2,1.0,0.67,0.8
+0.5,union,emergence_simulation,2,1,0,1,1.0,0.5,0.67
+0.5,union,permanence_consequence,3,2,0,1,1.0,0.67,0.8
+0.5,union,content_exhaustion,5,3,5,2,0.38,0.6,0.46
+0.5,union,ALL (micro),57,35,17,22,0.67,0.61,0.64

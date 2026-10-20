@@ -9,5 +9,6 @@ Early-stage game design project.
 ## Research
 - [01 — Gameplay loops research plan](docs/research/01-gameplay-loops.md)
 - [02 — Gameplay loops findings](docs/research/02-gameplay-loops-findings.md)
+- [03 — Steam review mining findings](docs/research/03-review-mining-findings.md) (pipeline in [research/review_mining/](research/review_mining/))
 - Data: [gameplay-loops.csv](docs/research/data/gameplay-loops.csv), [steam-metrics-2026-10.csv](docs/research/data/steam-metrics-2026-10.csv)
 - Raw notes: [research_notes/](research_notes/)
