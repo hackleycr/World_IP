@@ -25,14 +25,16 @@ df = df[(df.words >= 20) & (df.words <= 600)].reset_index(drop=True)
 docs = df.text.str.replace(r"\[/?[a-z0-9*]+\]", " ", regex=True).tolist()  # strip Steam BBCode
 
 model_name = "sentence-transformers/all-MiniLM-L6-v2"
+embedder = SentenceTransformer(model_name)
 cache = f"{out}/embeddings.npy"
 if os.path.exists(cache):
     emb = np.load(cache)
 else:
-    emb = SentenceTransformer(model_name).encode(docs, batch_size=64, show_progress_bar=True)
+    emb = embedder.encode(docs, batch_size=64, show_progress_bar=True)
     np.save(cache, emb)
 
 topic_model = BERTopic(
+    embedding_model=embedder,
     umap_model=UMAP(n_neighbors=15, n_components=5, min_dist=0.0, metric="cosine", random_state=42),
     hdbscan_model=HDBSCAN(min_cluster_size=60, min_samples=10, metric="euclidean",
                           cluster_selection_method="eom", prediction_data=True),

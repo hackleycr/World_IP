@@ -1,0 +1,317 @@
+{
+ "_note": "Hand-coded pillar themes. Keys are review ids; 'dev' was coded after seeing codebook tags (used for calibration), 'test' was coded blind before any method's output was viewed. Themes listed are those judged present.",
+ "themes": [
+  "grind_repetition",
+  "progress_loss_devaluation",
+  "discovery_curiosity",
+  "learning_curve_opacity",
+  "creativity_building",
+  "emergence_simulation",
+  "permanence_consequence",
+  "content_exhaustion"
+ ],
+ "dev": {
+  "161024848": [],
+  "228767605": [
+   "discovery_curiosity"
+  ],
+  "227860688": [],
+  "218497693": [],
+  "130145492": [
+   "discovery_curiosity",
+   "learning_curve_opacity"
+  ],
+  "230611676": [
+   "discovery_curiosity",
+   "grind_repetition"
+  ],
+  "211874584": [],
+  "204324880": [
+   "content_exhaustion",
+   "discovery_curiosity",
+   "grind_repetition"
+  ],
+  "237796232": [],
+  "234166052": [],
+  "237245106": [],
+  "234712784": [],
+  "49519296": [
+   "discovery_curiosity",
+   "learning_curve_opacity"
+  ],
+  "110694313": [
+   "grind_repetition"
+  ],
+  "237292579": [],
+  "238117216": [
+   "creativity_building"
+  ],
+  "237971138": [
+   "progress_loss_devaluation"
+  ],
+  "89198054": [
+   "discovery_curiosity",
+   "grind_repetition"
+  ],
+  "214791012": [],
+  "189919881": [
+   "grind_repetition",
+   "permanence_consequence"
+  ],
+  "216309752": [],
+  "192145687": [
+   "discovery_curiosity",
+   "emergence_simulation"
+  ],
+  "237555614": [],
+  "186864417": [
+   "discovery_curiosity",
+   "grind_repetition"
+  ],
+  "235164929": [],
+  "180519214": [
+   "discovery_curiosity"
+  ],
+  "230563346": [
+   "discovery_curiosity"
+  ],
+  "220606606": [],
+  "232293274": [],
+  "233282462": [],
+  "228647953": [
+   "learning_curve_opacity",
+   "permanence_consequence"
+  ],
+  "207777863": [
+   "content_exhaustion",
+   "grind_repetition"
+  ],
+  "237682820": [
+   "content_exhaustion",
+   "creativity_building"
+  ],
+  "214759881": [],
+  "234966357": [],
+  "236939487": [
+   "permanence_consequence"
+  ],
+  "117670365": [
+   "learning_curve_opacity"
+  ],
+  "217655037": [
+   "learning_curve_opacity"
+  ],
+  "232926943": [
+   "discovery_curiosity"
+  ],
+  "234026186": [],
+  "201407816": [],
+  "232946661": [],
+  "233372148": [
+   "discovery_curiosity"
+  ],
+  "231297868": [],
+  "238156237": [
+   "creativity_building",
+   "grind_repetition"
+  ],
+  "23751498": [
+   "content_exhaustion"
+  ],
+  "78521357": [
+   "creativity_building"
+  ],
+  "231157165": [],
+  "231813886": [
+   "permanence_consequence"
+  ],
+  "121585581": [
+   "learning_curve_opacity"
+  ],
+  "212361274": [
+   "discovery_curiosity"
+  ],
+  "186997860": [
+   "progress_loss_devaluation"
+  ],
+  "101453134": [
+   "learning_curve_opacity"
+  ],
+  "238149551": [],
+  "237029164": [
+   "discovery_curiosity"
+  ],
+  "236831199": [],
+  "190305547": [
+   "learning_curve_opacity"
+  ],
+  "214263824": [
+   "discovery_curiosity",
+   "grind_repetition",
+   "permanence_consequence"
+  ],
+  "53705358": [
+   "emergence_simulation"
+  ],
+  "197819172": [
+   "creativity_building",
+   "discovery_curiosity",
+   "grind_repetition"
+  ]
+ },
+ "test": {
+  "171735737": [
+   "content_exhaustion",
+   "grind_repetition"
+  ],
+  "211189454": [
+   "learning_curve_opacity"
+  ],
+  "199991426": [],
+  "169006955": [],
+  "155745876": [],
+  "215827355": [
+   "content_exhaustion",
+   "learning_curve_opacity"
+  ],
+  "231735262": [],
+  "236112160": [],
+  "218544849": [],
+  "228754177": [
+   "learning_curve_opacity"
+  ],
+  "237920223": [],
+  "217162982": [],
+  "236163711": [
+   "creativity_building",
+   "discovery_curiosity",
+   "learning_curve_opacity",
+   "permanence_consequence"
+  ],
+  "229482053": [
+   "content_exhaustion",
+   "grind_repetition"
+  ],
+  "232621860": [
+   "grind_repetition"
+  ],
+  "231372610": [],
+  "137384538": [
+   "discovery_curiosity"
+  ],
+  "165810959": [
+   "discovery_curiosity",
+   "learning_curve_opacity"
+  ],
+  "178857919": [
+   "discovery_curiosity",
+   "grind_repetition",
+   "progress_loss_devaluation"
+  ],
+  "230794850": [
+   "discovery_curiosity"
+  ],
+  "233265685": [
+   "grind_repetition"
+  ],
+  "168369894": [
+   "discovery_curiosity",
+   "grind_repetition"
+  ],
+  "237190287": [],
+  "237397429": [],
+  "152685634": [
+   "grind_repetition"
+  ],
+  "237975146": [],
+  "114246816": [
+   "learning_curve_opacity"
+  ],
+  "236829533": [],
+  "199023383": [
+   "grind_repetition"
+  ],
+  "236450350": [],
+  "237825562": [],
+  "234836975": [],
+  "234173895": [
+   "progress_loss_devaluation"
+  ],
+  "231787080": [
+   "learning_curve_opacity"
+  ],
+  "237968520": [
+   "grind_repetition",
+   "permanence_consequence",
+   "progress_loss_devaluation"
+  ],
+  "237915299": [
+   "content_exhaustion",
+   "discovery_curiosity"
+  ],
+  "231007052": [
+   "discovery_curiosity"
+  ],
+  "93875856": [],
+  "225308370": [],
+  "224668108": [
+   "grind_repetition"
+  ],
+  "194775951": [
+   "progress_loss_devaluation"
+  ],
+  "20784079": [],
+  "237584959": [
+   "creativity_building",
+   "discovery_curiosity"
+  ],
+  "218471971": [
+   "content_exhaustion",
+   "grind_repetition"
+  ],
+  "238120788": [
+   "creativity_building",
+   "discovery_curiosity",
+   "grind_repetition"
+  ],
+  "189195352": [
+   "creativity_building",
+   "learning_curve_opacity"
+  ],
+  "61547773": [
+   "discovery_curiosity",
+   "grind_repetition",
+   "permanence_consequence"
+  ],
+  "238098638": [
+   "emergence_simulation"
+  ],
+  "216841202": [
+   "learning_curve_opacity"
+  ],
+  "205169002": [],
+  "176931359": [
+   "discovery_curiosity"
+  ],
+  "23541285": [
+   "grind_repetition"
+  ],
+  "220858035": [
+   "creativity_building",
+   "emergence_simulation"
+  ],
+  "237666859": [],
+  "237087470": [
+   "creativity_building"
+  ],
+  "221235079": [
+   "grind_repetition"
+  ],
+  "234997238": [],
+  "237717962": [],
+  "234399585": [],
+  "168453426": [
+   "learning_curve_opacity"
+  ]
+ }
+}
