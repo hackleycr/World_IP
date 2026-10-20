@@ -1,6 +1,6 @@
 # Research Task: Gameplay Loops of Popular Games
 
-Status: **planned, not started.** (Decision D6 in [../design/01-pillars.md](../design/01-pillars.md#0-decision-log).)
+Status: **first pass complete (2026-10-20)** — see [02-gameplay-loops-findings.md](02-gameplay-loops-findings.md). Review-text mining is the remaining step. (Decision D6 in [../design/01-pillars.md](../design/01-pillars.md#0-decision-log).)
 
 ## Goal
 
