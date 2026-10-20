@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
 <title>World IP Prototype</title>
 <style>
 :root {
@@ -13,19 +14,22 @@
   :root:not([data-theme="light"]) {
     --bg: #161614; --panel: #201f1c; --ink: #ecebe6; --muted: #a29e94; --line: #34322d;
     --accent: #e0774a; --accent-ink: #1b1209; --ok: #6cc690; --unk: #e7b85a; --chip: #2a2925;
+    color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #161614; --panel: #201f1c; --ink: #ecebe6; --muted: #a29e94; --line: #34322d;
   --accent: #e0774a; --accent-ink: #1b1209; --ok: #6cc690; --unk: #e7b85a; --chip: #2a2925;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink);
   font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 12px 16px 4px; }
+header, main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding-block: 12px 4px; }
 header h1 { font-size: 18px; margin: 0; }
 header p { margin: 0; color: var(--muted); font-size: 13px; }
-main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; padding: 8px 16px 16px; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; padding-block: 8px 16px; }
 @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
 .stage { min-width: 0; }
 canvas { width: 100%; height: auto; display: block; image-rendering: pixelated; border-radius: 6px;
