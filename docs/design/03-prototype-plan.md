@@ -1,6 +1,6 @@
 # Prototype 0 — "Is discovery fun?"
 
-Status: v0.2 built 2026-10-20 after [playtest 01](../playtests/2026-10-20-playtest-01.md) — [prototype/index.html](../../prototype/index.html). Throwaway: it exists to answer one question, and its code is not the production base (D12).
+Status: v0.3 (climate) built 2026-10-20 after playtests [01 and 02](../playtests/2026-10-20-playtest-01.md) — [prototype/index.html](../../prototype/index.html). Throwaway: it exists to answer one question, and its code is not the production base (D12).
 
 ## The question
 
@@ -37,3 +37,17 @@ Status: v0.2 built 2026-10-20 after [playtest 01](../playtests/2026-10-20-playte
 3. Pass/fail signals:
    - **Pass:** the first player-caused reaction comes within 5 minutes; at least one recipe is saved; players describe chains of reactions they worked out ("I made charcoal to get the fire hot enough for…").
    - **Fail:** players paint pictures instead of experimenting; they can't tell why something happened; they stop after seeing the first few reactions.
+
+## Version history
+
+| Version | What changed | Why |
+|---|---|---|
+| v0 | First build | Test the core question |
+| v0.2 | Labels showing reactions on the map, a cursor readout, recipes saved by working backwards from a result, discovery cards, hints | Playtest 01 feedback |
+| v0.3 | **Climate:** humidity, evaporation, clouds and rain; wind from an ocean beyond the east edge, deflected upward by terrain; plants that move soil water into the air and wilt without it; humidity view; rain gauge; climate panel (wind, ocean humidity, rain by region, water budget, questions to investigate). Also: fires quenched by water dump their heat into it, and charcoal relights only with real air | Playtest 01 requests (deserts, mountains, forests); the player chose climate first |
+
+**Verified headlessly for v0.3:**
+- Water is conserved over 5 minutes: water cells stay at 350–390.
+- Rain concentrates on the windward slope. Flattening the mountain moves it into the valley: 71 vs. about 3 cells' worth, over 3 minutes.
+- The earlier chains (charcoal, glass, brick, metal, ice) still work.
+- Speed: 1.7–2.0 ms per step.

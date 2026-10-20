@@ -90,7 +90,7 @@ label { font-size: 13px; }
 </head>
 <body>
 <header>
-  <h1>World IP Prototype 0.2</h1>
+  <h1>World IP Prototype 0.3</h1>
   <p>Experiment with the world. Every reaction you notice goes in the journal; every one you cause becomes a law.</p>
 </header>
 <main>
@@ -110,6 +110,7 @@ label { font-size: 13px; }
       <button data-tool="observe">Observe</button>
       <label>Brush <input id="brush" type="range" min="1" max="7" value="2"></label>
       <button id="thermal" title="Instrument: shows temperature">Thermal view</button>
+      <button id="humview" title="Instrument: shows how close the air is to saturation">Humidity view</button>
       <button id="pause">Pause</button>
       <select id="speed" aria-label="Speed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
     </div>
@@ -137,6 +138,28 @@ label { font-size: 13px; }
       <details><summary class="small">Import a recipe code</summary>
         <textarea id="importbox" placeholder="Paste a recipe code"></textarea>
         <button id="importbtn">Import</button>
+      </details>
+    </section>
+    <section class="card">
+      <h2>Climate</h2>
+      <div class="row">
+        <select id="winddir" aria-label="Wind direction">
+          <option value="-1">Wind from the east (ocean)</option><option value="1">Wind from the west</option><option value="0">Calm</option>
+        </select>
+        <label>Strength <input id="windstr" type="range" min="0" max="3" step="0.5" value="1"></label>
+      </div>
+      <div class="row"><label>Ocean air humidity <input id="oceanrh" type="range" min="0" max="100" value="85"></label> <span class="small" id="oceanrhv">85%</span></div>
+      <div class="small">Blue bars along the bottom of the world are a rain gauge: rain in each column over the last minute or so.</div>
+      <div class="small" id="rainzones"></div>
+      <div class="small" id="waterbudget"></div>
+      <details><summary class="small">Questions to investigate</summary>
+        <ul class="small" style="margin:4px 0 0;padding-left:18px">
+          <li>Where does the rain fall, and why is the desert dry?</li>
+          <li>What happens to the valley's rain if you flatten the mountain, or build a new one?</li>
+          <li>Does a forest make the air downwind wetter? Plant seeds by water and watch the humidity view.</li>
+          <li>What happens to plants when the wind stops bringing ocean air?</li>
+          <li>Can you make the desert bloom?</li>
+        </ul>
       </details>
     </section>
     <section class="card">
@@ -207,7 +230,16 @@ const TORCH_MAX = 350, VENT_T = 1250, LF = 40, LV = 120, DIFF = 0.25;
 let C = { ...BASE };
 
 let mat = new Uint8Array(N), T = new Float32Array(N), life = new Float32Array(N),
-    age = new Uint16Array(N), shade = new Uint8Array(N), stamp = new Uint8Array(N);
+    age = new Uint16Array(N), shade = new Uint8Array(N), stamp = new Uint8Array(N),
+    // Water mass in units of one water cell. Air: water vapour. Water/mud: how much has evaporated
+    // (at 1 the cell is gone). Plant: days without water. Air also keeps cloud water in `life`.
+    moist = new Float32Array(N);
+// Vapour an air cell can hold before it saturates: rises steeply with temperature.
+const sat = t => 0.03 * Math.exp(0.055 * Math.max(-40, Math.min(t, 120)));
+const RAIN_AT = 0.3;   // cloud water in one cell that falls as a (partial) raindrop
+const LVAP = 60;
+const climate = { windDir: -1, wind: 1, oceanRH: 0.85, rainCol: new Float32Array(W),
+                  water: { inflow: 0, outflow: 0, evaporated: 0, transpired: 0, rained: 0 } };
 let tick = 0, frameId = 1, rng = Math.random, seed = 1, tier = 0, shiftedKeys = [];
 
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
@@ -227,7 +259,7 @@ const RX = [
   ["freeze", "Water freezes into ice", ICE], ["melt", "Ice melts into water", WATER],
   ["ignite_wood", "Wood catches fire", null], ["ignite_plant", "Plants catch fire", null],
   ["burnout", "Fire burns out, leaving ash", ASH], ["smother", "Fire starved of air leaves charcoal", CHARCOAL],
-  ["quench", "Water quenches burning wood into charcoal", CHARCOAL],
+  ["quench", "Water quenches a fire into charcoal", CHARCOAL],
   ["pyrolysis", "Wood heated without air turns to charcoal", CHARCOAL],
   ["ignite_coal", "Charcoal catches fire — and burns hotter", null],
   ["sand_melt", "Sand melts", MGLASS], ["glass_set", "Molten sand sets into glass", GLASS],
@@ -236,6 +268,9 @@ const RX = [
   ["wet_dirt", "Water soaks dirt into mud", MUD], ["dry_mud", "Mud dries back into dirt", DIRT],
   ["sprout", "A seed sprouts", PLANT], ["lignify", "Old plant stems turn to wood", WOOD],
   ["seed_burn", "Seeds burn to ash", ASH],
+  ["evaporate", "Water evaporates into the air", null], ["cloud", "Moist air cools into cloud", null],
+  ["rain", "Clouds rain", null], ["transpire", "Plants breathe water vapour into the air", null],
+  ["wilt", "Plants without water wilt and rot into soil", null],
 ].map(([id, name, prod]) => ({ id, name, prod, seen: 0, caused: 0, tmin: Infinity, tmax: -Infinity, first: null }));
 const RXI = Object.fromEntries(RX.map((r, i) => [r.id, i]));
 const SHORT = { boil: "Water → steam", condense: "Steam → water", freeze: "Water → ice", melt: "Ice → water",
@@ -243,7 +278,8 @@ const SHORT = { boil: "Water → steam", condense: "Steam → water", freeze: "W
   quench: "Water: fire → charcoal", pyrolysis: "Hot wood, no air → charcoal", ignite_coal: "Charcoal ignites (hotter!)",
   sand_melt: "Sand melts", glass_set: "→ Glass", clay_fire: "Clay → brick", lava_cool: "Lava → stone", stone_melt: "Stone melts",
   smelt: "Ore → metal", wet_dirt: "Dirt + water → mud", dry_mud: "Mud dries", sprout: "Seed sprouts", lignify: "Plant → wood",
-  seed_burn: "Seed burns" };
+  seed_burn: "Seed burns", evaporate: "Water evaporates", cloud: "Cloud forms", rain: "Rain",
+  transpire: "Plant breathes out vapour", wilt: "Plant wilts" };
 // Three hints per material, from a nudge to the answer. The player chooses when to ask.
 const HINTS = {
   [ICE]: ["Ice already exists somewhere in this world. Where is it?", "Hover around: the air gets colder the higher you go.",
@@ -261,7 +297,7 @@ const HINTS = {
 };
 const hintLevel = {};
 // Reactions whose trigger is not a temperature: the journal does not show a measured temperature for these.
-const NON_THERMAL = new Set(["wet_dirt", "sprout", "lignify", "quench", "smother"]);
+const NON_THERMAL = new Set(["wet_dirt", "sprout", "lignify", "quench", "smother", "rain", "transpire", "wilt"]);
 let journalDirty = true;
 
 // Player activity map: 8x8 blocks, last tick the player acted there. Used to tell player-caused events.
@@ -294,15 +330,16 @@ function ev(id, i, temp) {
 }
 
 // ---------- Cell helpers ----------
-function set(i, m, temp) { mat[i] = m; if (temp !== undefined) T[i] = temp; life[i] = 0; age[i] = 0; shade[i] = rng() * 255; }
+function set(i, m, temp) { mat[i] = m; if (temp !== undefined) T[i] = temp; life[i] = 0; age[i] = 0; moist[i] = 0; shade[i] = rng() * 255; }
 // Change material keeping the cell's thermal energy (temperature rescaled by heat capacity).
-function morph(i, m) { const e = T[i] * P[mat[i]].cap; mat[i] = m; T[i] = e / P[m].cap; life[i] = 0; age[i] = 0; }
+function morph(i, m) { const e = T[i] * P[mat[i]].cap; mat[i] = m; T[i] = e / P[m].cap; life[i] = 0; age[i] = 0; moist[i] = 0; }
 function swap(a, b) {
   let t = mat[a]; mat[a] = mat[b]; mat[b] = t;
   let f = T[a]; T[a] = T[b]; T[b] = f;
   f = life[a]; life[a] = life[b]; life[b] = f;
   t = age[a]; age[a] = age[b]; age[b] = t;
   t = shade[a]; shade[a] = shade[b]; shade[b] = t;
+  f = moist[a]; moist[a] = moist[b]; moist[b] = f;
   stamp[a] = stamp[b] = frameId;
 }
 const N8 = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
@@ -367,13 +404,33 @@ function moveGas(x, y, i, m) {
 function react(x, y, i, m) {
   const t = T[i];
   switch (m) {
-    case AIR:
-      if (y > 0 && mat[i - W] === AIR && T[i - W] < t - 3 && rng() < 0.6) swap(i, i - W); // hot air rises
-      break;
+    case AIR: {
+      // Vapour beyond saturation condenses into cloud (releasing latent heat); cloud in dry air evaporates.
+      const s = sat(t), v = moist[i]; let c = life[i] > 0 ? life[i] : (life[i] = 0);
+      if (v > s) { const d = (v - s) * 0.5; moist[i] = v - d; life[i] = c + d; T[i] += d * LVAP / P[AIR].cap;
+        if (c < 0.02 && c + d >= 0.02 && rng() < 0.01) ev("cloud", i, t); }
+      else if (c > 0) { const d = Math.min(c, (s - v) * 0.5); moist[i] = v + d; life[i] = c - d; T[i] -= d * LVAP / P[AIR].cap; }
+      c = life[i];
+      if (c > 0.02) {
+        // Droplets merge with neighbouring cloud, and sink through saturated air (heavy ones through any air).
+        for (const d of [-1, 1]) { const X = x + d; if (X >= 0 && X < W && mat[i + d] === AIR && life[i + d] > 0) { const q = life[i + d] * 0.15; life[i + d] -= q; life[i] += q; } }
+        const b = i + W;
+        if (y + 1 < H && mat[b] === AIR && (moist[b] >= 0.95 * sat(T[b]) || life[i] > 0.15)) { const q = life[i] * 0.1; life[i] -= q; life[b] += q; }
+      }
+      if (life[i] >= RAIN_AT) { rainDrop(x, y, i); break; }
+      if (y > 0 && mat[i - W] === AIR && T[i - W] < T[i] - 3 && rng() < 0.6) swap(i, i - W); // warm air rises
+      break; }
     case WATER:
       if (t > C.boil) { life[i] += (t - C.boil) * 2; T[i] = C.boil; if (life[i] >= LV) { ev("boil", i, C.boil); mat[i] = STEAM; T[i] = C.boil; life[i] = 0; } }
       else if (t < C.freeze) { life[i] -= (C.freeze - t) * 2; T[i] = C.freeze; if (life[i] <= -LF) { ev("freeze", i, C.freeze); mat[i] = ICE; T[i] = C.freeze; life[i] = 0; } }
-      if (rng() < 0.002) { const j = hasNeighbor(x, y, n => n === DIRT); if (j >= 0) { ev("wet_dirt", j, T[j]); morph(j, MUD); set(i, AIR, T[i]); } }
+      if (rng() < 0.002) { const j = hasNeighbor(x, y, n => n === DIRT); if (j >= 0) { ev("wet_dirt", j, T[j]); const lost = moist[i]; morph(j, MUD); moist[j] = lost; set(i, AIR, T[i]); break; } }
+      if (moist[i] > 0.001) {   // a partial cell (raindrop) pours its water into a partial neighbour below or beside it
+        for (const j of [i + W, i - 1, i + 1]) { if (j < 0 || j >= N || mat[j] !== WATER || moist[j] <= 0.001) continue;
+          const t2 = Math.min(1 - moist[i], moist[j]); moist[j] -= t2; moist[i] += t2;
+          if (moist[i] >= 0.999) { mat[i] = AIR; T[i] = amb(y); life[i] = 0; moist[i] = 0; break; } }
+        if (mat[i] !== WATER) break;
+      }
+      if (evaporate(x, y, i, 0.0006, 2)) { mat[i] = AIR; T[i] = amb(y); life[i] = 0; ev("evaporate", i, t); }
       break;
     case ICE:
       if (t > C.freeze) { life[i] += (t - C.freeze) * 1; T[i] = C.freeze; if (life[i] >= LF) { ev("melt", i, C.freeze); mat[i] = WATER; T[i] = C.freeze; life[i] = 0; } }
@@ -384,7 +441,8 @@ function react(x, y, i, m) {
     case MUD:
       // Drying gives the water back as steam, so water is conserved through the mud cycle.
       if (t >= C.mudDry) { const a = hasNeighbor(x, y, n => n === AIR);
-        if (a >= 0) { ev("dry_mud", i, t); morph(i, DIRT); mat[a] = STEAM; life[a] = 0; } }
+        if (a >= 0) { ev("dry_mud", i, t); morph(i, DIRT); mat[a] = STEAM; life[a] = 0; } break; }
+      if (evaporate(x, y, i, 0.0004, P[MUD].cap)) { ev("dry_mud", i, t); morph(i, DIRT); }
       break;
     case CLAY:
       if (t >= C.clayFire) { ev("clay_fire", i, t); morph(i, BRICK); }
@@ -413,6 +471,7 @@ function react(x, y, i, m) {
     case PLANT:
       if (t >= C.woodIgnite - 30 && hasNeighbor(x, y, isAirish) >= 0) { ev("ignite_plant", i, t); morph(i, EMBER); life[i] = 90; break; }
       growPlant(x, y, i);
+      if (mat[i] === PLANT) transpire(x, y, i);
       break;
     case SEED:
       if (t >= 200) { ev("seed_burn", i, t); morph(i, ASH); break; }
@@ -421,7 +480,7 @@ function react(x, y, i, m) {
       }
       break;
     case CHARCOAL:
-      if (t >= C.coalIgnite && hasNeighbor(x, y, isAirish) >= 0) { ev("ignite_coal", i, t); morph(i, COAL_EMBER); life[i] = 600; }
+      if (t >= C.coalIgnite && hasNeighbor(x, y, n => n === AIR) >= 0) { ev("ignite_coal", i, t); morph(i, COAL_EMBER); life[i] = 600; }
       break;
     case EMBER: case COAL_EMBER: burn(x, y, i, m); break;
     case ORE:
@@ -429,7 +488,7 @@ function react(x, y, i, m) {
         if (j >= 0) { ev("smelt", i, t); morph(i, METAL); morph(j, ASH); } }
       break;
     case SMOKE:
-      if ((life[i] -= 1) <= 0) mat[i] = AIR;
+      if ((life[i] -= 1) <= 0) { mat[i] = AIR; life[i] = 0; }
       break;
   }
 }
@@ -439,7 +498,9 @@ function burn(x, y, i, m) {
   // Flames heat everything they touch directly (radiation and hot gas), not just by slow conduction.
   for (const [dx, dy] of N8) { const X = x + dx, Y = y + dy; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
     const j = idx(X, Y), f = 0.02 * (T[i] - T[j]); if (f <= 0) continue; T[i] -= f / cap; T[j] += f / P[mat[j]].cap; }
-  if (hasNeighbor(x, y, n => n === WATER) >= 0 && !coal) { ev("quench", i, T[i]); morph(i, CHARCOAL); return; }
+  const wj = hasNeighbor(x, y, n => n === WATER);
+  if (wj >= 0) {   // quenched: the fire's heat above 100° goes into the water (which boils), leaving cool charcoal
+    ev("quench", i, T[i]); const e = Math.max(0, T[i] - 100) * cap; T[i] = Math.min(T[i], 100); T[wj] += e / P[WATER].cap; morph(i, CHARCOAL); return; }
   if (hasNeighbor(x, y, isAirish) < 0) { if (!coal) { ev("smother", i, T[i]); morph(i, CHARCOAL); } else morph(i, CHARCOAL); return; }
   if (y > 0 && mat[i - W] === AIR && rng() < 0.04) { mat[i - W] = SMOKE; life[i - W] = 60 + rng() * 60; }
   if ((life[i] -= 1) <= 0) { ev("burnout", i, T[i]); morph(i, ASH); }
@@ -453,6 +514,69 @@ function growPlant(x, y, i) {
   }
 }
 
+// ---------- Water in the air ----------
+// Evaporate from cell i into the air above it. Returns true once a whole cell's worth has gone.
+function evaporate(x, y, i, rate, cap) {
+  if (y === 0 || mat[i - W] !== AIR) return false;
+  const a = i - W, s = sat(T[i]);
+  if (moist[a] >= s) return false;
+  const e = Math.min(rate * (s - moist[a]), 0.00025);
+  moist[a] += e; moist[i] += e; T[i] -= e * LVAP / cap; climate.water.evaporated += e;
+  if (rng() < 0.0005) ev("evaporate", i, T[i]);
+  return moist[i] >= 1;
+}
+function rainDrop(x, y, i) {
+  // A raindrop is a water cell holding `life` worth of water: its missing mass is recorded as already evaporated.
+  const mass = Math.min(1, life[i]), extra = life[i] - mass, vap = moist[i];
+  mat[i] = WATER; life[i] = 0; moist[i] = 1 - mass;
+  if (y > 0 && mat[i - W] === AIR) { life[i - W] += extra; moist[i - W] += vap; }
+  climate.rainCol[x] += mass; climate.water.rained += mass;
+  ev("rain", i, T[i]);
+}
+// Find soil water a plant can reach: look down to the ground below it, then around its roots.
+function rootWater(x, y) {
+  let gy = y + 1;
+  while (gy < H && gy < y + 24 && (mat[idx(x, gy)] === PLANT || mat[idx(x, gy)] === WOOD || mat[idx(x, gy)] === AIR)) gy++;
+  for (let j = gy; j < Math.min(H, gy + 4); j++) for (let k = -2; k <= 2; k++) { const X = x + k; if (X < 0 || X >= W) continue;
+    const m = mat[idx(X, j)]; if (m === MUD || m === WATER) return idx(X, j); }
+  return -1;
+}
+function transpire(x, y, i) {
+  if (rng() > 0.05 || y === 0 || mat[i - W] !== AIR) return;
+  const a = i - W, s = sat(T[a]);
+  if (moist[a] >= s) return;
+  const src = rootWater(x, y);
+  if (src >= 0) {
+    const e = Math.min(0.004 * (s - moist[a]), 0.01);
+    moist[a] += e; moist[src] += e; moist[i] = 0; climate.water.transpired += e;
+    if (rng() < 0.002) ev("transpire", i, T[i]);
+    if (moist[src] >= 1) { if (mat[src] === WATER) { mat[src] = AIR; moist[src] = 0; life[src] = 0; } else morph(src, DIRT); }
+  } else if ((moist[i] += 1) > 600) { ev("wilt", i, T[i]); morph(i, DIRT); }
+}
+// Prevailing wind: each tick every air cell passes a share of its vapour and cloud water downwind,
+// or upward where terrain blocks the way (air forced over a mountain). Ocean air enters upwind.
+const dq = new Float32Array(N), dc = new Float32Array(N);
+function windStep() {
+  const dir = climate.windDir, c = climate.wind * 0.12;
+  if (c <= 0 || dir === 0) return;
+  dq.fill(0); dc.fill(0);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x; if (mat[i] !== AIR) continue;
+    const nx = x + dir; let j;
+    if (nx < 0 || nx >= W) j = -1;
+    else if (mat[i + dir] === AIR) j = i + dir;
+    else if (y > 0 && mat[i - W] === AIR) j = i - W;
+    else continue;
+    const fq = c * moist[i], fc = c * Math.max(0, life[i]);
+    dq[i] -= fq; dc[i] -= fc;
+    if (j >= 0) { dq[j] += fq; dc[j] += fc; } else climate.water.outflow += fq + fc;
+  }
+  for (let i = 0; i < N; i++) if (dq[i] !== 0 || dc[i] !== 0) { moist[i] += dq[i]; life[i] += dc[i]; }
+  const edgeIn = dir < 0 ? W - 1 : 0;
+  for (let y = 0; y < H; y++) { const i = y * W + edgeIn;
+    if (mat[i] === AIR) { const add = c * climate.oceanRH * sat(amb(y)); moist[i] += add; climate.water.inflow += add; } }
+}
+
 // ---------- Heat ----------
 const vents = [];
 function heatStep() {
@@ -464,7 +588,10 @@ function heatStep() {
         T[i] -= f / ca; T[j] += f / P[b].cap; }
       if (y + 1 < H) { const j = i + W, b = mat[j], c = Math.min(ka, P[b].k) * DIFF, f = c * (T[i] - T[j]);
         T[i] -= f / ca; T[j] += f / P[b].cap; }
-      if (a === AIR || a === SMOKE) { const d = (amb(y) - T[i]) * 0.01; T[i] += d; energy.sky += d * ca; }
+      if (a === AIR || a === SMOKE) { const d = (amb(y) - T[i]) * 0.01; T[i] += d; energy.sky += d * ca;
+        if (a === AIR) {   // vapour mixes between neighbouring air cells
+          if (x + 1 < W && mat[i + 1] === AIR) { const f = 0.05 * (moist[i] - moist[i + 1]); moist[i] -= f; moist[i + 1] += f; }
+          if (y + 1 < H && mat[i + W] === AIR) { const f = 0.05 * (moist[i] - moist[i + W]); moist[i] -= f; moist[i + W] += f; } } }
     }
   }
   for (const i of vents) { if (mat[i] === LAVA && T[i] < VENT_T) { energy.deepEarth += (VENT_T - T[i]) * P[LAVA].cap; T[i] = VENT_T; } }
@@ -487,7 +614,9 @@ function step() {
       if (!moved) react(x, y, i, m);
     }
   }
+  windStep();
   heatStep();
+  for (let x = 0; x < W; x++) climate.rainCol[x] *= 0.9997;
   runRecipes();
   tick++;
 }
@@ -531,8 +660,11 @@ function generate() {
   for (let y = 95; y < H - 2; y++) for (let x = 85; x < 136; x++) { const i = idx(x, y);
     if (mat[i] === STONE || mat[i] === ORE) { const dx = (x - 110) / 16, dy = (y - 124) / 15, d = Math.sqrt(dx * dx + dy * dy);
       T[i] = Math.max(T[i], 900 - (d - 1) * 900); } }
-  // Trees
+  // Starting humidity: half-saturated air
+  for (let i = 0; i < N; i++) if (mat[i] === AIR) moist[i] = 0.5 * sat(T[i]);
+  // Trees, with damp soil around their roots
   for (const tx of [55, 75, 140, 152, 163]) { const g = ground(tx), h = 6 + (rng() * 4 | 0);
+    for (let j = 0; j < 3; j++) for (let k = -2; k <= 2; k++) { const q = idx(tx + k, g + j); if (mat[q] === DIRT) set(q, MUD, T[q]); }
     for (let k = 1; k <= h; k++) set(idx(tx, g - k), WOOD, 20);
     for (let j = -3; j <= 2; j++) for (let i = -3; i <= 3; i++) if (i * i + j * j < 10) { const X = tx + i, Y = g - h - 1 + j;
       if (mat[idx(X, Y)] === AIR) { set(idx(X, Y), PLANT, 20); age[idx(X, Y)] = 2000; } } }
@@ -546,7 +678,7 @@ function generate() {
 
 // ---------- Rendering ----------
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d"), img = ctx.createImageData(W, H), px = img.data;
-let thermal = false, hoverI = -1;
+let thermal = false, view = "normal", hoverI = -1;
 function thermalColor(t) { const u = Math.max(0, Math.min(1, (t + 20) / 1220));
   return [255 * Math.min(1, u * 2), 255 * Math.max(0, Math.min(1, u * 3 - 1)), 255 * Math.max(0, 1 - u * 3) + 255 * Math.max(0, u * 3 - 2)]; }
 function drawLegend() {
@@ -561,13 +693,19 @@ function render() {
   for (let i = 0; i < N; i++) {
     const m = mat[i], t = T[i], o = i * 4;
     let r, g, b;
-    if (thermal) {
+    if (view === "humidity") {
+      if (m === AIR) { const rh = Math.min(1, moist[i] / sat(t)); r = 225 - rh * 185; g = 190 - rh * 90; b = 130 + rh * 85;
+        if (life[i] > 0.004) { r = g = b = 255; } }
+      else { const c = P[m].col; r = c[0] * .35 + 40; g = c[1] * .35 + 40; b = c[2] * .35 + 40; if (m === WATER || m === MUD) { r = 30; g = 70; b = 200; } }
+    } else if (thermal) {
       [r, g, b] = thermalColor(t);
       if (m === AIR) { r *= .55; g *= .55; b *= .55; }
     } else {
       const c = P[m].col, n = (shade[i] - 128) * (m === AIR ? 0.02 : 0.09);
       r = c[0] + n; g = c[1] + n; b = c[2] + n;
-      if (m === AIR) { const y = i / W | 0; const s = 1 - y / H * .35; r *= s; g *= s; b *= s; }
+      if (m === AIR) { const y = i / W | 0; const s = 1 - y / H * .35; r *= s; g *= s; b *= s;
+        const c = life[i]; if (c > 0.004) { const a = Math.min(.9, c * 5), w = 238 - Math.min(80, c * 120);
+          r += (w - r) * a; g += (w - g) * a; b += (w + 4 - b) * a; } }
       if (t > 450) { const gc = glow(t), a = Math.min(m === AIR || m === SMOKE ? .95 : .8, (t - 450) / 500);
         r += (gc[0] - r) * a; g += (gc[1] - g) * a; b += (gc[2] - b) * a; }
       if (m === EMBER || m === COAL_EMBER) { const f = (shade[i] + tick * 7) % 255 / 255; r = 255; g = 90 + f * 120; b = 30 + f * 40; }
@@ -609,8 +747,11 @@ function drawPalette() {
 function setTool(t) { tool = t; document.querySelectorAll("#tools [data-tool]").forEach(b => b.classList.toggle("on", b.dataset.tool === t)); drawPalette(); }
 document.querySelectorAll("#tools [data-tool]").forEach(b => b.onclick = () => setTool(b.dataset.tool));
 document.getElementById("brush").oninput = e => brush = +e.target.value;
-document.getElementById("thermal").onclick = e => { thermal = !thermal; e.target.classList.toggle("on", thermal);
-  document.getElementById("legend").hidden = !thermal; };
+document.getElementById("thermal").onclick = e => { thermal = !thermal; view = "normal"; e.target.classList.toggle("on", thermal);
+  document.getElementById("humview").classList.remove("on"); document.getElementById("legend").hidden = !thermal; };
+document.getElementById("humview").onclick = e => { view = view === "humidity" ? "normal" : "humidity"; thermal = false;
+  e.target.classList.toggle("on", view === "humidity"); document.getElementById("thermal").classList.remove("on");
+  document.getElementById("legend").hidden = true; };
 let paused = false, speed = 1;
 document.getElementById("pause").onclick = e => { paused = !paused; e.target.textContent = paused ? "Play" : "Pause"; e.target.classList.toggle("on", paused); };
 document.getElementById("speed").onchange = e => speed = +e.target.value;
@@ -655,12 +796,16 @@ function drawOverlay() {
     octx.fillStyle = p.mine ? "#ffd27a" : "#ffffff"; octx.fillText(p.text, tx, ty);
   }
   octx.globalAlpha = 1;
+  // Rain gauge: recent rainfall per column, drawn as bars rising from the bottom edge.
+  octx.fillStyle = "rgba(90,160,255,.85)";
+  for (let x = 0; x < W; x++) { const v = climate.rainCol[x]; if (v > 0.05) { const bh = Math.min(h * .12, v * 3 * dpr); octx.fillRect(x * sx, h - bh, Math.ceil(sx), bh); } }
 }
 function drawTip() {
   const el = document.getElementById("tip");
   if (hoverI < 0) { el.hidden = true; return; }
   const y = hoverI / W | 0, alt = 80 - y;
-  el.innerHTML = `${P[mat[hoverI]].name} · <b class="t">${Math.round(T[hoverI])}°</b> <span class="alt">· ${alt >= 0 ? `altitude ${alt}` : `depth ${-alt}`}</span>`;
+  const m = mat[hoverI], air = m === AIR ? ` · humidity ${Math.round(100 * moist[hoverI] / sat(T[hoverI]))}%${life[hoverI] > 0.02 ? " · cloud" : ""}` : "";
+  el.innerHTML = `${life[hoverI] > 0.02 && m === AIR ? "Cloud" : P[m].name} · <b class="t">${Math.round(T[hoverI])}°</b> <span class="alt">${air} · ${alt >= 0 ? `altitude ${alt}` : `depth ${-alt}`}</span>`;
   el.hidden = false;
   const flip = tipX > cv.clientWidth - 200;
   el.style.left = `${tipX}px`; el.style.top = `${tipY}px`;
@@ -762,9 +907,9 @@ function drawSnaps() {
   const el = document.getElementById("snaps"); el.innerHTML = "";
   snaps.forEach((s, n) => {
     const a = document.createElement("button"); a.textContent = `Save ${n + 1}`;
-    a.onclick = () => { snaps[n] = { mat: mat.slice(), T: T.slice(), life: life.slice(), age: age.slice(), shade: shade.slice(), at: secs() }; metrics.snapshotsSaved++; drawSnaps(); };
+    a.onclick = () => { snaps[n] = { mat: mat.slice(), T: T.slice(), life: life.slice(), age: age.slice(), shade: shade.slice(), moist: moist.slice(), at: secs() }; metrics.snapshotsSaved++; drawSnaps(); };
     const b = document.createElement("button"); b.textContent = s ? `Load ${n + 1} (${s.at}s)` : `Load ${n + 1}`; b.disabled = !s;
-    b.onclick = () => { mat.set(s.mat); T.set(s.T); life.set(s.life); age.set(s.age); shade.set(s.shade); metrics.snapshotsLoaded++; };
+    b.onclick = () => { mat.set(s.mat); T.set(s.T); life.set(s.life); age.set(s.age); shade.set(s.shade); moist.set(s.moist); metrics.snapshotsLoaded++; };
     el.append(a, b);
   });
 }
@@ -797,6 +942,15 @@ function drawJournal() {
   }
   journalDirty = false;
 }
+function drawClimate() {
+  const zone = (a, b) => { let s = 0; for (let x = a; x < b; x++) s += climate.rainCol[x]; return s; }, f = v => v.toFixed(1);
+  document.getElementById("rainzones").textContent = `Recent rain — desert ${f(zone(0, 42))} · valley ${f(zone(42, 170))} · mountain ${f(zone(170, 214))} · coast ${f(zone(214, W))}`;
+  const w = climate.water;
+  document.getElementById("waterbudget").textContent = `Water moved (cells) — from ocean ${f(w.inflow)} · evaporated ${f(w.evaporated)} · from plants ${f(w.transpired)} · rained ${f(w.rained)} · blown away ${f(w.outflow)}`;
+}
+document.getElementById("winddir").onchange = e => climate.windDir = +e.target.value;
+document.getElementById("windstr").oninput = e => climate.wind = +e.target.value;
+document.getElementById("oceanrh").oninput = e => { climate.oceanRH = e.target.value / 100; document.getElementById("oceanrhv").textContent = `${e.target.value}%`; };
 function drawMetrics() {
   const f = v => v === null ? "—" : `${v}s`;
   document.getElementById("metrics").innerHTML =
@@ -808,7 +962,8 @@ document.getElementById("export").onclick = () => {
   const box = document.getElementById("exportbox"); box.hidden = false;
   box.value = JSON.stringify({ seed, tier, shiftedKeys, seconds: secs(), metrics, energy,
     reactions: RX.map(r => ({ id: r.id, seen: r.seen, caused: r.caused, first: r.first })),
-    recipes: recipes.map(r => ({ name: r.name, steps: r.strokes.length, runs: r.history })) }, null, 1);
+    recipes: recipes.map(r => ({ name: r.name, steps: r.strokes.length, runs: r.history })),
+    climate: { windDir: climate.windDir, wind: climate.wind, oceanRH: climate.oceanRH, water: climate.water } }, null, 1);
   box.select();
 };
 let toastTimer = 0;
@@ -846,6 +1001,7 @@ function newWorld() {
   for (const r of RX) Object.assign(r, { seen: 0, caused: 0, tmin: Infinity, tmax: -Infinity, first: null });
   Object.assign(metrics, { firstSeen: null, firstCaused: null, firstLaw: null, firstRecipe: null, recipeRuns: 0, causedEvents: 0, strokes: 0 });
   for (const k in energy) energy[k] = 0;
+  for (const k in climate.water) climate.water[k] = 0; climate.rainCol.fill(0);
   touched.fill(-1e9); palette = new Set(BASE_PALETTE); runs = []; newMats.clear(); pings.length = 0;
   strokeLog.length = 0; lastProduct = null; for (const k in hintLevel) delete hintLevel[k]; document.getElementById("disc").hidden = true;
   for (const r of recipes) r.verified = false;
@@ -874,10 +1030,10 @@ function loop(now) {
   drawStatus();
   if (discTimer > 0 && --discTimer === 0) document.getElementById("disc").hidden = true;
   document.getElementById("savelast").disabled = !lastProduct;
-  if (++uiTick % 15 === 0) { if (journalDirty) drawJournal(); drawMetrics(); }
+  if (++uiTick % 15 === 0) { if (journalDirty) drawJournal(); drawMetrics(); drawClimate(); }
   requestAnimationFrame(loop);
 }
-window.WORLD = { step, mat, T, P, RX, C: () => C, energy, metrics, applyBrush, idx, generate, M: { AIR, STONE, SAND, WATER, WOOD, CHARCOAL, ORE, METAL, GLASS, CLAY, BRICK, PLANT, STEAM, ICE, LAVA }, setSeed: s => { seed = s; } };
+window.WORLD = { step, mat, T, P, RX, moist, life, climate, sat, C: () => C, energy, metrics, applyBrush, idx, generate, M: { AIR, STONE, SAND, WATER, WOOD, CHARCOAL, ORE, METAL, GLASS, CLAY, BRICK, PLANT, STEAM, ICE, LAVA }, setSeed: s => { seed = s; } };
 drawSnaps(); drawLegend(); newWorld();
 requestAnimationFrame(loop);
 </script>

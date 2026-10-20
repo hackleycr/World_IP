@@ -27,10 +27,14 @@ This is the smallest set I think still produces interesting combinations. Every 
 | P6 | **Reactions** (A + B + condition → C + D ± energy) | Chemistry, combustion, erosion | Wood + heat → fire → ash + heat |
 | P7 | **Growth** (living cells spread when conditions are met) | Biology and regrowth | A seed with water, light and soil becomes a plant |
 | P8 | **Energy inputs** (sunlight, deep geothermal heat) | Where new energy comes from | The sun warms the surface; the deep earth is hot |
+| P9 | **Humidity** (water vapour in air; saturation rises steeply with temperature) | Evaporation, clouds, rain, plant water use | Moist air rising up a mountain cools, clouds form, and it rains; the far side stays dry |
+| P10 | **Wind** (a prevailing air flow, deflected upward by terrain) | Where moisture goes | Ocean air brings rain to the windward slope and leaves a rain shadow behind |
+
+P9 and P10 were added in prototype v0.3 (2026-10-20), after playtest 01 asked how mountains, forests and deserts shape the climate. Water is conserved through the whole cycle: ocean inflow, evaporation, plants releasing vapour, cloud, rain, soaking into soil, and drying out. Raindrops can be partial cells, and they merge when they touch.
 
 **Conservation (from section 4 of the pillars doc):** heat energy is conserved inside the simulation. It enters only through P8 and leaves only through slow radiation into the sky. Every reaction in P6 declares its energy change explicitly. This is the main balance lever (D3).
 
-Deliberately left out of the MVP: electricity, pressure, magnetism, wind and light as a simulated quantity. Each is a candidate expansion once the core is shown to work. Adding new primitives is also the planned long-term way to bring players back, instead of content packs [R16].
+Deliberately left out of the MVP: electricity, pressure, magnetism and light as a simulated quantity (wind was added in v0.3). Each is a candidate expansion once the core is shown to work. Adding new primitives is also the planned long-term way to bring players back, instead of content packs [R16].
 
 **Randomness in the simulation is noise the player can learn from [R7].** Small random variations, such as which neighbour a powder falls towards, keep the world from looking mechanical. But the *outcome* of a reaction is decided by its conditions, never by a dice roll. Run the same arrangement under the same conditions and you get the same result.
 
