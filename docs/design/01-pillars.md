@@ -1,13 +1,13 @@
 # Design Pillars — First Pass
 
-Status: draft for discussion. See the decision log (section 0) for what has been settled.
+Status: draft, updated 2026-10-20 with research findings. See the decision log (section 0) for what has been settled, and section 2a for the design rules the player research supports.
 
 ## 0. Decision log
 
 | # | Topic | Decision |
 |---|---|---|
 | D1 | What counts as effort | Reward thinking above effort, but effort always counts for something. |
-| D2 | Randomized-rules mode | Add a mode where each world's rule constants are randomized, so players have to learn reality from the ground up every time. See [02-ruleset-mvp.md](02-ruleset-mvp.md#5-randomized-rules-mode). |
+| D2 | Randomized-rules mode | Add a mode where each world's rule constants are randomized, so players have to learn reality from the ground up. **Revised after research:** randomization is tiered. The default changes a few high-value constants; "learn everything from scratch" is the expert tier. See [02-ruleset-mvp.md](02-ruleset-mvp.md#5-randomized-rules-mode). |
 | D3 | Balance | Balance is a hard requirement. The conserved-quantity foundation (section 4) is the main tool for it, backed by measurement in the prototype. |
 | D4 | Conserved-quantity foundation | Accepted as a working idea; revisit after prototyping. |
 | D5 | Scope | Treat everything outside the core gameplay loop as an MVP placeholder, then iterate. |
@@ -17,7 +17,9 @@ Status: draft for discussion. See the decision log (section 0) for what has been
 | D9 | How created actions are recorded | Recipes, to start with. |
 | D10 | Goal | Deferred; leave it as an MVP placeholder for now. |
 | D11 | Consequences | Actions have permanent consequences: the world can be damaged. |
-| D12 | Team, engine, platform | Deferred until more research is done. |
+| D12 | Team, engine, platform | Deferred until more research is done. The throwaway prototype is built in the browser (HTML canvas + JavaScript) because it is quickest to build and share; this does not decide the production engine. |
+| D13 | Design rules from research | Adopt the design rules in section 2a as working requirements. Each rule is backed by [02-gameplay-loops-findings.md](../research/02-gameplay-loops-findings.md) and [03-review-mining-findings.md](../research/03-review-mining-findings.md), and each has a metric to test in the prototype. |
+| D14 | Preservation and sharing | Saving snapshots of past world states and sharing recipes move from "placeholder" into the MVP, because the research ties both directly to Pillars 1–3 (see R9 and R14). |
 
 ## 1. The pillars, as stated
 
@@ -64,6 +66,29 @@ Risks to plan for:
 - **Knowledge counts as progress.** A player who understands the rules should be stronger than one who doesn't, even with the same items. Taken to its extreme, a skilled player could finish the game early because they know enough.
 - **Discovered actions are real things in the game.** Once the player works out a new effect, they should be able to name it, save it, reuse it, refine it and (perhaps) share it. That needs some kind of *grammar*: runes, recipes, circuits, code, or gestures.
 
+## 2a. Design rules from player research
+
+These rules come from the research: 58 games compared, and 35,942 Steam reviews mined. Evidence and metrics are in [02-gameplay-loops-findings.md](../research/02-gameplay-loops-findings.md#recommendations-tied-to-the-three-pillars) ("rec." numbers) and [03-review-mining-findings.md](../research/03-review-mining-findings.md#4-what-this-changes-for-the-design). Where each rule shows up in the ruleset is in [02-ruleset-mvp.md](02-ruleset-mvp.md).
+
+| # | Pillar | Rule | Key evidence |
+|---|---|---|---|
+| R1 | P1, P3 | **First insight in the first hour.** The starting area shows two or three phenomena the player can observe but that are not explained, and the player saves a first recipe early. | Negative reviewers of discovery games quit at a median of 5.8 h; onboarding is a cross-genre complaint topic (67% negative) |
+| R2 | P3 | **The journal separates rumours from laws.** Observations are logged as "?" entries; confirmed reactions become laws. | Outer Wilds ship log; information-gap theory |
+| R3 | P1 | **Experiments are cheap.** Small tests cost little and are easy to contain. Risk and energy cost apply to large-scale use. | Free undo in Baba Is You; Noita's "no safety net" complaint |
+| R4 | P1 | **No repetition between two insights.** Recipes take the repetition out once the player understands something. New tiers change *what* the player does (new primitives, verbs, tools), not *how long* it takes. | In discovery games, grind is 3.5× (codebook) / 1.9× (union method) more frequent in negative reviews; Potion Craft "padded with filler" |
+| R5 | P1 | **Never devalue past effort.** Rebalance by adding rules, never by nerfing or deleting recipes players own. | Diablo IV Season 14 backlash; Destiny 2 sunsetting; lost progress is 3.3× more frequent in negative reviews |
+| R6 | P1 | **Unlocks widen capability** (instruments, verbs, precision). They do not raise stats. Any power boost is small and refundable. | Balatro and Slay the Spire breadth unlocks; Vampire Survivors refunds |
+| R7 | P1, P3 | **Variation must be learnable, never a gamble.** Every random element can be worked out by experiment. Luck never gates the expressive toolkit. | The "RNG in card games" topic is 94% negative; Noita reviewers call wand luck "gambling" |
+| R8 | P2 | **Signal permanence before it happens, and make it causal.** Large irreversible actions are previewed, showing the area affected and the energy cost. Nothing is ever lost silently. Collapses can be traced back to their cause. | Negative mentions of permanence are almost all unannounced lockouts or silent losses; losses that feel "meaningless" are what players resent |
+| R9 | P2 | **Players can finish and keep their work:** snapshots, a "fossil record" of past world states, and named landmarks that outlive their cells. | The IKEA effect disappears when the creation is destroyed |
+| R10 | P2 | **Spread is slow and visible, and can be contained.** Damage that spreads can be stopped, and ruined ground becomes new ecology to explore. | Terraria spread complaints and the pause toggle added later; Dwarf Fortress's "Losing is fun" |
+| R11 | P3 | **Physics never breaks its own rules.** No special cases, including "structures that should collapse but don't". | Teardown complaints are about inconsistency, not destruction |
+| R12 | P1, P3 | **Recipes are open-ended and scored.** Any valid solution works. Recipes are scored on yield, energy and time against a distribution. Freedom comes with constraints. | Zachtronics topic only 20% negative; "too unrestricted to be challenging" is the failure on the other side |
+| R13 | P3 | **Insight produces spectacle:** a successful idea causes a visible, satisfying change in the world, not a quiet unlock. | The Strategy motivation has declined (Quantic Foundry); "Greatest game ever" topic is 8% negative |
+| R14 | P3 | **Recipes can be shared** (export/import) to give players a social reason to play and to turn individual insight into community knowledge. | Self-determination theory's need to feel connected to others is otherwise unmet; Tears of the Kingdom build communities |
+| R15 | All | **Simulation performance is a design priority.** Frame rate and stability count as gameplay. | Crashes are the largest cross-game topic (89% negative); bugs and performance are the top negative theme for sandbox games |
+| R16 | P2, P3 | **Long-term re-engagement comes from new primitives** (electricity, pressure, wind…), not from content packs. | Factorio's and Satisfactory's record player counts years later came with releases that added new systems |
+
 ## 3. How the pillars fit together: the core loop
 
 ```
@@ -108,6 +133,8 @@ Each of these does part of what we want. None does all three.
 
 ## 6. Open questions (needed before the next design pass)
 
+Resolved or deferred in the decision log: 1 → D7, 2 → D8, 3 → D9, 4 → D10, 6 → D11, 7 → D12. Question 5 (single-player or shared world) is partly answered: recipes are shared (D14), and the world remains single-player for the MVP.
+
 1. **Perspective and dimension.** 2D (much cheaper to simulate at large scale, like Noita) or 3D?
 2. **Fiction / setting.** Magic, science, a mix, or something abstract? This decides what the conserved quantity and the primitives *look like*.
 3. **What is the "grammar" for created actions?** Runes / glyphs, physical contraptions, a visual programming language, gestures, recipes?
@@ -118,12 +145,22 @@ Each of these does part of what we want. None does all three.
 
 ## 7. Suggested next steps
 
-1. Answer the open questions above, at least 1–4.
-2. Draft the **primitive set**: the smallest list of properties, forces and interactions that could produce interesting combinations. Aim for 6–12 primitives.
-3. Build a **throwaway toy prototype** (a 2D grid sandbox is the cheapest) to test one thing only: *is it fun to discover how two or three primitives interact?* That is the riskiest assumption in the whole design, so test it first.
+1. ~~Answer the open questions above, at least 1–4.~~ Done (decision log).
+2. ~~Draft the **primitive set**.~~ Done: 8 primitives in [02-ruleset-mvp.md](02-ruleset-mvp.md).
+2a. ~~Research gameplay loops and player sentiment.~~ Done: [02](../research/02-gameplay-loops-findings.md) and [03](../research/03-review-mining-findings.md).
+3. **Next:** build a **throwaway toy prototype**. The plan is in [03-prototype-plan.md](03-prototype-plan.md). (a 2D grid sandbox is the cheapest) to test one thing only: *is it fun to discover how two or three primitives interact?* That is the riskiest assumption in the whole design, so test it first.
 4. Only after that, design progression, setting and content.
 
 ## Sources
+
+**Player research behind section 2a** (full source lists inside each report)
+- First-pass research report — [../research/02-gameplay-loops-findings.md](../research/02-gameplay-loops-findings.md)
+- Steam review mining report — [../research/03-review-mining-findings.md](../research/03-review-mining-findings.md)
+- Steam reviews endpoint (data source) — https://store.steampowered.com/appreviews/881100?json=1
+- IKEA effect (Norton, Mochon & Ariely) — https://papers.ssrn.com/abstract=1777100
+- Outer Wilds ship log analysis — https://paigecuthbertson.com/pdfs/The_Ship_Log_in_Outer_Wilds.pdf
+- Noita alchemy randomization — https://noita.wiki.gg/wiki/Alchemy
+- Factorio Space Age player record — https://gamingonlinux.com/2024/10/factorio-space-age-sold-over-400000-copies-and-sets-a-new-player-count-record
 
 **Design concepts**
 - Emergent gameplay — https://en.wikipedia.org/wiki/Emergent_gameplay

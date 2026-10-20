@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>World IP Prototype</title>
+<style>
+:root {
+  --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6860; --line: #dedad2;
+  --accent: #b4532a; --accent-ink: #ffffff; --ok: #2f7d4f; --unk: #9a6b00; --chip: #f0ece4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161614; --panel: #201f1c; --ink: #ecebe6; --muted: #a29e94; --line: #34322d;
+    --accent: #e0774a; --accent-ink: #1b1209; --ok: #6cc690; --unk: #e7b85a; --chip: #2a2925;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161614; --panel: #201f1c; --ink: #ecebe6; --muted: #a29e94; --line: #34322d;
+  --accent: #e0774a; --accent-ink: #1b1209; --ok: #6cc690; --unk: #e7b85a; --chip: #2a2925;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 12px 16px 4px; }
+header h1 { font-size: 18px; margin: 0; }
+header p { margin: 0; color: var(--muted); font-size: 13px; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; padding: 8px 16px 16px; }
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+.stage { min-width: 0; }
+canvas { width: 100%; height: auto; display: block; image-rendering: pixelated; border-radius: 6px;
+  border: 1px solid var(--line); touch-action: none; cursor: crosshair; background: #000; }
+.bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
+.status { font-size: 12px; color: var(--muted); min-height: 18px; font-variant-numeric: tabular-nums; }
+button, select, input[type=text], textarea {
+  font: inherit; color: var(--ink); background: var(--chip); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 9px; }
+button { cursor: pointer; }
+button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+textarea { width: 100%; min-height: 70px; font-size: 12px; font-family: ui-monospace, monospace; }
+.side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+section.card h2 { font-size: 13px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.palette { display: flex; flex-wrap: wrap; gap: 5px; }
+.swatch { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 4px; font-size: 12px; }
+.swatch i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid rgba(0,0,0,.25); }
+ul.list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow: auto; }
+ul.list li { padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+ul.list li:last-child { border-bottom: 0; }
+.tag { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 10px; margin-right: 6px; }
+.tag.law { background: var(--ok); color: var(--panel); }
+.tag.rumor { background: var(--unk); color: var(--panel); }
+.small { font-size: 12px; color: var(--muted); }
+.row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.goal { display: inline-block; margin: 2px 6px 2px 0; font-size: 13px; }
+.goal.done { color: var(--ok); font-weight: 600; }
+label { font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>World IP Prototype 0</h1>
+  <p>Experiment with the world. Every reaction you notice goes in the journal; every one you cause becomes a law.</p>
+</header>
+<main>
+  <div class="stage">
+    <canvas id="cv" width="240" height="135" aria-label="Simulation world"></canvas>
+    <div class="status" id="status">Hover to observe.</div>
+    <div class="bar" id="tools">
+      <button data-tool="paint" class="on">Paint</button>
+      <button data-tool="torch" title="Heats up to a limit — hotter needs insight">Torch</button>
+      <button data-tool="dig">Dig</button>
+      <button data-tool="observe">Observe</button>
+      <label>Brush <input id="brush" type="range" min="1" max="7" value="2"></label>
+      <button id="thermal" title="Instrument: shows temperature">Thermal view</button>
+      <button id="pause">Pause</button>
+      <select id="speed" aria-label="Speed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
+    </div>
+    <div class="palette" id="palette"></div>
+  </div>
+  <div class="side">
+    <section class="card">
+      <h2>Journal</h2>
+      <div class="small" id="jsum"></div>
+      <ul class="list" id="journal"></ul>
+    </section>
+    <section class="card">
+      <h2>Materials this world can make</h2>
+      <div id="goals"></div>
+    </section>
+    <section class="card">
+      <h2>Recipes</h2>
+      <div class="row">
+        <button id="rec">Record</button>
+        <input type="text" id="recname" placeholder="Recipe name" style="flex:1;min-width:110px">
+      </div>
+      <div class="small" id="recstate">Record your strokes, then run them anywhere as one action.</div>
+      <ul class="list" id="recipes"></ul>
+      <details><summary class="small">Import a recipe code</summary>
+        <textarea id="importbox" placeholder="Paste a recipe code"></textarea>
+        <button id="importbtn">Import</button>
+      </details>
+    </section>
+    <section class="card">
+      <h2>Snapshots</h2>
+      <div class="row" id="snaps"></div>
+    </section>
+    <section class="card">
+      <h2>World</h2>
+      <div class="row">
+        <select id="tier" aria-label="Rules tier">
+          <option value="0">Tier 0: standard rules</option>
+          <option value="1">Tier 1: shifted rules</option>
+        </select>
+        <input type="text" id="seed" style="width:90px" aria-label="Seed">
+        <button id="newworld">New world</button>
+      </div>
+      <div class="small" id="tierinfo"></div>
+      <button id="reveal" class="small">Reveal shifted constants</button>
+      <div class="small" id="revealed"></div>
+    </section>
+    <section class="card">
+      <h2>Playtest metrics</h2>
+      <div class="small" id="metrics"></div>
+      <button id="export">Export metrics</button>
+      <textarea id="exportbox" hidden readonly></textarea>
+    </section>
+  </div>
+</main>
+<script>
+"use strict";
+// ---------- Grid ----------
+const W = 240, H = 135, N = W * H;
+const AIR=0, STONE=1, SAND=2, DIRT=3, MUD=4, CLAY=5, WATER=6, ICE=7, STEAM=8, WOOD=9, PLANT=10, SEED=11,
+      EMBER=12, COAL_EMBER=13, ASH=14, LAVA=15, ORE=16, METAL=17, GLASS=18, BRICK=19, CHARCOAL=20,
+      SMOKE=21, MGLASS=22, BEDROCK=23;
+const GAS=0, POWDER=1, LIQUID=2, SOLID=3;
+const P = [];
+function def(id, name, phase, dens, k, cap, col) { P[id] = { name, phase, dens, k, cap, col }; }
+//  id        name            phase   dens  cond  cap   colour
+def(AIR,      "Air",          GAS,    0,    .02,  .3,  [150, 190, 225]);
+def(STONE,    "Stone",        SOLID,  9,    .25,  1,   [118, 116, 112]);
+def(SAND,     "Sand",         POWDER, 1.6,  .15,  .8,  [214, 190, 120]);
+def(DIRT,     "Dirt",         POWDER, 1.4,  .12,  1,   [116, 82, 52]);
+def(MUD,      "Mud",          POWDER, 1.8,  .2,   1.5, [88, 66, 48]);
+def(CLAY,     "Clay",         SOLID,  9,    .15,  1,   [176, 120, 96]);
+def(WATER,    "Water",        LIQUID, 1,    .3,   2,   [52, 104, 196]);
+def(ICE,      "Ice",          SOLID,  9,    .3,   1,   [196, 228, 246]);
+def(STEAM,    "Steam",        GAS,    .3,   .03,  .5,  [222, 226, 232]);
+def(WOOD,     "Wood",         SOLID,  9,    .06,  .8,  [124, 84, 46]);
+def(PLANT,    "Plant",        SOLID,  9,    .08,  1.2, [70, 150, 62]);
+def(SEED,     "Seed",         POWDER, .9,   .05,  .8,  [196, 170, 92]);
+def(EMBER,    "Burning wood", SOLID,  9,    .3,   .8,  [214, 92, 30]);
+def(COAL_EMBER,"Burning charcoal",SOLID,9,  .3,   .8,  [240, 140, 40]);
+def(ASH,      "Ash",          POWDER, .6,   .05,  .5,  [150, 148, 144]);
+def(LAVA,     "Lava",         LIQUID, 3,    .3,   1.2, [220, 70, 20]);
+def(ORE,      "Ore",          SOLID,  9,    .3,   1,   [128, 96, 92]);
+def(METAL,    "Metal",        SOLID,  9,    .8,   1,   [176, 182, 192]);
+def(GLASS,    "Glass",        SOLID,  9,    .1,   .8,  [178, 222, 220]);
+def(BRICK,    "Brick",        SOLID,  9,    .05,  1,   [160, 64, 46]);
+def(CHARCOAL, "Charcoal",     SOLID,  9,    .08,  .7,  [40, 38, 38]);
+def(SMOKE,    "Smoke",        GAS,    .1,   .02,  .3,  [96, 92, 90]);
+def(MGLASS,   "Molten glass", LIQUID, 2.4,  .15,  .8,  [255, 160, 60]);
+def(BEDROCK,  "Bedrock",      SOLID,  99,   .002, 1,   [40, 36, 40]);
+
+const BASE = { freeze: 0, boil: 100, woodIgnite: 280, woodFlame: 700, coalIgnite: 400, coalFlame: 1200,
+               sandMelt: 1000, clayFire: 500, oreSmelt: 900, lavaSolid: 800, stoneMelt: 1300, mudDry: 100 };
+const TORCH_MAX = 350, VENT_T = 1250, LF = 40, LV = 120, DIFF = 0.25;
+let C = { ...BASE };
+
+let mat = new Uint8Array(N), T = new Float32Array(N), life = new Float32Array(N),
+    age = new Uint16Array(N), shade = new Uint8Array(N), stamp = new Uint8Array(N);
+let tick = 0, frameId = 1, rng = Math.random, seed = 1, tier = 0, shiftedKeys = [];
+
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const idx = (x, y) => y * W + x;
+const amb = y => y < 80 ? 20 - (80 - y) * 0.55 : 20;
+
+// ---------- Energy & metrics ----------
+const energy = { torch: 0, chemistry: 0, deepEarth: 0, sky: 0, dug: 0 };
+const metrics = { firstSeen: null, firstCaused: null, firstLaw: null, firstRecipe: null, recipeRuns: 0,
+                  causedEvents: 0, recipesSaved: 0, snapshotsSaved: 0, snapshotsLoaded: 0, strokes: 0 };
+const secs = () => +(tick / 60).toFixed(1);
+
+// ---------- Reactions (the world's rules) ----------
+const RX = [
+  ["boil", "Water boils into steam", STEAM], ["condense", "Steam condenses back into water", WATER],
+  ["freeze", "Water freezes into ice", ICE], ["melt", "Ice melts into water", WATER],
+  ["ignite_wood", "Wood catches fire", null], ["ignite_plant", "Plants catch fire", null],
+  ["burnout", "Fire burns out, leaving ash", ASH], ["smother", "Fire starved of air leaves charcoal", CHARCOAL],
+  ["quench", "Water quenches burning wood into charcoal", CHARCOAL],
+  ["pyrolysis", "Wood heated without air turns to charcoal", CHARCOAL],
+  ["ignite_coal", "Charcoal catches fire — and burns hotter", null],
+  ["sand_melt", "Sand melts", MGLASS], ["glass_set", "Molten sand sets into glass", GLASS],
+  ["clay_fire", "Clay fires into brick", BRICK], ["lava_cool", "Lava cools into stone", STONE],
+  ["stone_melt", "Stone melts into lava", LAVA], ["smelt", "Ore touching charcoal, heated, gives metal", METAL],
+  ["wet_dirt", "Water soaks dirt into mud", MUD], ["dry_mud", "Mud dries back into dirt", DIRT],
+  ["sprout", "A seed sprouts", PLANT], ["lignify", "Old plant stems turn to wood", WOOD],
+  ["seed_burn", "Seeds burn to ash", ASH],
+].map(([id, name, prod]) => ({ id, name, prod, seen: 0, caused: 0, tmin: Infinity, tmax: -Infinity, first: null }));
+const RXI = Object.fromEntries(RX.map((r, i) => [r.id, i]));
+// Reactions whose trigger is not a temperature: the journal does not show a measured temperature for these.
+const NON_THERMAL = new Set(["wet_dirt", "sprout", "lignify", "quench", "smother"]);
+let journalDirty = true;
+
+// Player activity map: 8x8 blocks, last tick the player acted there. Used to tell player-caused events.
+const BW = Math.ceil(W / 8), BH = Math.ceil(H / 8);
+let touched = new Int32Array(BW * BH).fill(-1e9);
+function markTouched(x, y) { const bx = x >> 3, by = y >> 3;
+  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+    const X = bx + i, Y = by + j; if (X >= 0 && Y >= 0 && X < BW && Y < BH) touched[Y * BW + X] = tick; } }
+function playerNear(i) { return tick - touched[((i / W | 0) >> 3) * BW + ((i % W) >> 3)] < 900; }
+
+function ev(id, i, temp) {
+  const r = RX[RXI[id]];
+  r.seen++;
+  if (temp < r.tmin) r.tmin = temp;
+  if (temp > r.tmax) r.tmax = temp;
+  if (r.first === null) { r.first = secs(); journalDirty = true; if (metrics.firstSeen === null) metrics.firstSeen = secs();
+    if (r.prod !== null) unlock(r.prod); }
+  if (playerNear(i)) {
+    if (r.caused === 0) { journalDirty = true; if (metrics.firstLaw === null) metrics.firstLaw = secs(); }
+    r.caused++; metrics.causedEvents++;
+    if (metrics.firstCaused === null) metrics.firstCaused = secs();
+  }
+}
+
+// ---------- Cell helpers ----------
+function set(i, m, temp) { mat[i] = m; if (temp !== undefined) T[i] = temp; life[i] = 0; age[i] = 0; shade[i] = rng() * 255; }
+// Change material keeping the cell's thermal energy (temperature rescaled by heat capacity).
+function morph(i, m) { const e = T[i] * P[mat[i]].cap; mat[i] = m; T[i] = e / P[m].cap; life[i] = 0; age[i] = 0; }
+function swap(a, b) {
+  let t = mat[a]; mat[a] = mat[b]; mat[b] = t;
+  let f = T[a]; T[a] = T[b]; T[b] = f;
+  f = life[a]; life[a] = life[b]; life[b] = f;
+  t = age[a]; age[a] = age[b]; age[b] = t;
+  t = shade[a]; shade[a] = shade[b]; shade[b] = t;
+  stamp[a] = stamp[b] = frameId;
+}
+const N8 = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+function hasNeighbor(x, y, pred) {
+  for (const [dx, dy] of N8) { const X = x + dx, Y = y + dy;
+    if (X >= 0 && Y >= 0 && X < W && Y < H && pred(mat[idx(X, Y)])) return idx(X, Y); }
+  return -1;
+}
+const isAirish = m => m === AIR || m === SMOKE;
+function within(x, y, r, m) {
+  for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) { const X = x + i, Y = y + j;
+    if (X >= 0 && Y >= 0 && X < W && Y < H && mat[idx(X, Y)] === m) return true; }
+  return false;
+}
+
+// ---------- Movement ----------
+function canDisplace(m, into) {
+  const pi = P[into];
+  if (pi.phase === GAS) return true;
+  if (pi.phase === LIQUID) return P[m].dens > pi.dens;
+  return false;
+}
+function movePowder(x, y, i, m) {
+  if (m === MUD && rng() > 0.3) return false;
+  if (y + 1 >= H) return false;
+  const b = i + W;
+  if (canDisplace(m, mat[b])) { swap(i, b); return true; }
+  const d = rng() < 0.5 ? -1 : 1;
+  for (const s of [d, -d]) { const X = x + s;
+    if (X >= 0 && X < W && canDisplace(m, mat[b + s]) && P[mat[i + s]].phase !== SOLID) { swap(i, b + s); return true; } }
+  return false;
+}
+function moveLiquid(x, y, i, m) {
+  if (m === LAVA && rng() > 0.4) return false;
+  if (y + 1 < H) {
+    const b = i + W;
+    if (canDisplace(m, mat[b])) { swap(i, b); return true; }
+    const d = rng() < 0.5 ? -1 : 1;
+    for (const s of [d, -d]) { const X = x + s; if (X >= 0 && X < W && canDisplace(m, mat[b + s])) { swap(i, b + s); return true; } }
+  }
+  const d = rng() < 0.5 ? -1 : 1;
+  for (const s of [d, -d]) {
+    for (let k = 1; k <= 3; k++) { const X = x + s * k; if (X < 0 || X >= W) break;
+      const j = i + s * k; if (P[mat[j]].phase !== GAS) break;
+      if (k === 3 || P[mat[j + s]] === undefined || P[mat[j + s]].phase !== GAS || X + s < 0 || X + s >= W) { swap(i, j); return true; } }
+  }
+  return false;
+}
+function moveGas(x, y, i, m) {
+  if (y > 0) {
+    const a = i - W;
+    if (mat[a] === AIR || (P[mat[a]].phase === GAS && P[mat[a]].dens > P[m].dens)) { if (rng() < 0.7) { swap(i, a); return true; } }
+    const d = rng() < 0.5 ? -1 : 1, X = x + d;
+    if (X >= 0 && X < W && mat[a + d] === AIR && rng() < 0.5) { swap(i, a + d); return true; }
+  }
+  const d = rng() < 0.5 ? -1 : 1, X = x + d;
+  if (X >= 0 && X < W && mat[i + d] === AIR && rng() < 0.3) { swap(i, i + d); return true; }
+  return false;
+}
+
+// ---------- Rules per cell ----------
+function react(x, y, i, m) {
+  const t = T[i];
+  switch (m) {
+    case AIR:
+      if (y > 0 && mat[i - W] === AIR && T[i - W] < t - 3 && rng() < 0.6) swap(i, i - W); // hot air rises
+      break;
+    case WATER:
+      if (t > C.boil) { life[i] += (t - C.boil) * 2; T[i] = C.boil; if (life[i] >= LV) { ev("boil", i, C.boil); mat[i] = STEAM; T[i] = C.boil; life[i] = 0; } }
+      else if (t < C.freeze) { life[i] -= (C.freeze - t) * 2; T[i] = C.freeze; if (life[i] <= -LF) { ev("freeze", i, C.freeze); mat[i] = ICE; T[i] = C.freeze; life[i] = 0; } }
+      if (rng() < 0.002) { const j = hasNeighbor(x, y, n => n === DIRT); if (j >= 0) { ev("wet_dirt", j, T[j]); morph(j, MUD); set(i, AIR, T[i]); } }
+      break;
+    case ICE:
+      if (t > C.freeze) { life[i] += (t - C.freeze) * 1; T[i] = C.freeze; if (life[i] >= LF) { ev("melt", i, C.freeze); mat[i] = WATER; T[i] = C.freeze; life[i] = 0; } }
+      break;
+    case STEAM:
+      if (t < C.boil) { life[i] += (C.boil - t) * .5; T[i] = C.boil; if (life[i] >= LV) { ev("condense", i, C.boil); mat[i] = WATER; T[i] = C.boil; life[i] = 0; } }
+      break;
+    case MUD:
+      // Drying gives the water back as steam, so water is conserved through the mud cycle.
+      if (t >= C.mudDry) { const a = hasNeighbor(x, y, n => n === AIR);
+        if (a >= 0) { ev("dry_mud", i, t); morph(i, DIRT); mat[a] = STEAM; life[a] = 0; } }
+      break;
+    case CLAY:
+      if (t >= C.clayFire) { ev("clay_fire", i, t); morph(i, BRICK); }
+      break;
+    case SAND:
+      if (t >= C.sandMelt) { ev("sand_melt", i, t); morph(i, MGLASS); }
+      break;
+    case MGLASS:
+      if (t < C.sandMelt - 100) { ev("glass_set", i, t); morph(i, GLASS); }
+      break;
+    case GLASS:
+      if (t >= C.sandMelt + 20) morph(i, MGLASS);
+      break;
+    case LAVA:
+      if (t < C.lavaSolid) { ev("lava_cool", i, t); morph(i, STONE); }
+      break;
+    case STONE:
+      if (t >= C.stoneMelt) { ev("stone_melt", i, t); morph(i, LAVA); }
+      break;
+    case WOOD:
+      if (t >= C.woodIgnite) {
+        if (hasNeighbor(x, y, isAirish) >= 0) { ev("ignite_wood", i, t); morph(i, EMBER); life[i] = 400; }
+        else if (rng() < 0.02) { ev("pyrolysis", i, t); morph(i, CHARCOAL); }
+      }
+      break;
+    case PLANT:
+      if (t >= C.woodIgnite - 30 && hasNeighbor(x, y, isAirish) >= 0) { ev("ignite_plant", i, t); morph(i, EMBER); life[i] = 90; break; }
+      growPlant(x, y, i);
+      break;
+    case SEED:
+      if (t >= 200) { ev("seed_burn", i, t); morph(i, ASH); break; }
+      if (y + 1 < H && (mat[i + W] === DIRT || mat[i + W] === MUD) && rng() < 0.01 && (within(x, y, 3, WATER) || within(x, y, 3, MUD))) {
+        ev("sprout", i, t); morph(i, PLANT); life[i] = 5 + (rng() * 6 | 0) + (within(x, y, 2, ASH) ? 5 : 0); age[i] = within(x, y, 2, ASH) ? 3 : 1;
+      }
+      break;
+    case CHARCOAL:
+      if (t >= C.coalIgnite && hasNeighbor(x, y, isAirish) >= 0) { ev("ignite_coal", i, t); morph(i, COAL_EMBER); life[i] = 600; }
+      break;
+    case EMBER: case COAL_EMBER: burn(x, y, i, m); break;
+    case ORE:
+      if (t >= C.oreSmelt && rng() < 0.05) { const j = hasNeighbor(x, y, n => n === CHARCOAL || n === COAL_EMBER);
+        if (j >= 0) { ev("smelt", i, t); morph(i, METAL); morph(j, ASH); } }
+      break;
+    case SMOKE:
+      if ((life[i] -= 1) <= 0) mat[i] = AIR;
+      break;
+  }
+}
+function burn(x, y, i, m) {
+  const coal = m === COAL_EMBER, flame = coal ? C.coalFlame : C.woodFlame, cap = P[m].cap;
+  if (T[i] < flame) { const e = Math.min(coal ? 200 : 100, (flame - T[i]) * cap); T[i] += e / cap; energy.chemistry += e; }
+  // Flames heat everything they touch directly (radiation and hot gas), not just by slow conduction.
+  for (const [dx, dy] of N8) { const X = x + dx, Y = y + dy; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+    const j = idx(X, Y), f = 0.02 * (T[i] - T[j]); if (f <= 0) continue; T[i] -= f / cap; T[j] += f / P[mat[j]].cap; }
+  if (hasNeighbor(x, y, n => n === WATER) >= 0 && !coal) { ev("quench", i, T[i]); morph(i, CHARCOAL); return; }
+  if (hasNeighbor(x, y, isAirish) < 0) { if (!coal) { ev("smother", i, T[i]); morph(i, CHARCOAL); } else morph(i, CHARCOAL); return; }
+  if (y > 0 && mat[i - W] === AIR && rng() < 0.04) { mat[i - W] = SMOKE; life[i - W] = 60 + rng() * 60; }
+  if ((life[i] -= 1) <= 0) { ev("burnout", i, T[i]); morph(i, ASH); }
+}
+function growPlant(x, y, i) {
+  if (age[i] < 65000) age[i]++;
+  if (life[i] > 0 && y > 0 && mat[i - W] === AIR && rng() < 0.004 * (age[i] % 4 === 3 ? 3 : 1)) {
+    const a = i - W; mat[a] = PLANT; T[a] = T[i]; life[a] = life[i] - 1; age[a] = 0; shade[a] = rng() * 255; life[i] = 0;
+  } else if (life[i] === 0 && age[i] > 1500 && y > 0 && mat[i - W] === PLANT && rng() < 0.001) {
+    ev("lignify", i, T[i]); morph(i, WOOD);
+  }
+}
+
+// ---------- Heat ----------
+const vents = [];
+function heatStep() {
+  for (let y = 0; y < H; y++) {
+    const row = y * W;
+    for (let x = 0; x < W; x++) {
+      const i = row + x, a = mat[i], ka = P[a].k, ca = P[a].cap;
+      if (x + 1 < W) { const j = i + 1, b = mat[j], c = Math.min(ka, P[b].k) * DIFF, f = c * (T[i] - T[j]);
+        T[i] -= f / ca; T[j] += f / P[b].cap; }
+      if (y + 1 < H) { const j = i + W, b = mat[j], c = Math.min(ka, P[b].k) * DIFF, f = c * (T[i] - T[j]);
+        T[i] -= f / ca; T[j] += f / P[b].cap; }
+      if (a === AIR || a === SMOKE) { const d = (amb(y) - T[i]) * 0.01; T[i] += d; energy.sky += d * ca; }
+    }
+  }
+  for (const i of vents) { if (mat[i] === LAVA && T[i] < VENT_T) { energy.deepEarth += (VENT_T - T[i]) * P[LAVA].cap; T[i] = VENT_T; } }
+}
+
+function step() {
+  frameId = (frameId % 250) + 1;
+  for (let y = H - 1; y >= 0; y--) {
+    const ltr = (tick + y) & 1;
+    for (let k = 0; k < W; k++) {
+      const x = ltr ? k : W - 1 - k, i = y * W + x;
+      if (stamp[i] === frameId) continue;
+      const m = mat[i];
+      if (m === BEDROCK) continue;
+      const ph = P[m].phase;
+      let moved = false;
+      if (ph === POWDER) moved = movePowder(x, y, i, m);
+      else if (ph === LIQUID) moved = moveLiquid(x, y, i, m);
+      else if (ph === GAS && m !== AIR) moved = moveGas(x, y, i, m);
+      if (!moved) react(x, y, i, m);
+    }
+  }
+  heatStep();
+  runRecipes();
+  tick++;
+}
+
+// ---------- World generation ----------
+function ground(x) {
+  let g = 84 + 5 * Math.sin(x / 23 + seed) + 2.5 * Math.sin(x / 7.3 + seed * 2);
+  g -= Math.max(0, 58 - Math.abs(x - 205) * 1.7);             // mountain
+  if (x > 92 && x < 128) g += 9 * Math.sin((x - 92) / 36 * Math.PI); // pond basin
+  return Math.round(g);
+}
+function generate() {
+  rng = mulberry32(seed);
+  mat.fill(AIR); T.fill(20); life.fill(0); age.fill(0); vents.length = 0;
+  for (let i = 0; i < N; i++) shade[i] = rng() * 255;
+  const pondLevel = Math.min(ground(92), ground(128)) + 1;
+  for (let x = 0; x < W; x++) {
+    const g = ground(x);
+    for (let y = 0; y < H; y++) {
+      const i = idx(x, y);
+      if (y >= H - 2) { set(i, BEDROCK, 300); continue; }
+      if (y < g) { if (x > 92 && x < 128 && y >= pondLevel) set(i, WATER, 30); else set(i, AIR, amb(y)); continue; }
+      const d = y - g, cold = amb(y) < -2;
+      let m = STONE;
+      if (d < 4) m = cold && d < 3 ? ICE : (x < 42 ? SAND : DIRT);
+      if (x < 42 && d < 9) m = SAND;
+      if (x > 92 && x < 128 && d < 2) m = CLAY;
+      set(i, m, y < 80 ? Math.min(20, amb(y)) + d * 0.3 : 20 + d * 1.2);
+    }
+  }
+  // Ore veins
+  for (let v = 0; v < 9; v++) { let x = 10 + rng() * 220 | 0, y = 0; y = ground(x) + 8 + rng() * 25 | 0;
+    for (let s = 0; s < 14; s++) { x += rng() * 3 - 1 | 0; y += rng() * 3 - 1 | 0;
+      if (x > 0 && y > 0 && x < W && y < H - 3 && mat[idx(x, y)] === STONE) set(idx(x, y), ORE, T[idx(x, y)]); } }
+  // Lava chamber under the pond, fed by deep-earth vents
+  for (let y = 108; y < H - 2; y++) for (let x = 96; x < 126; x++) {
+    const dx = (x - 110) / 13, dy = (y - 124) / 12;
+    if (dx * dx + dy * dy < 1) set(idx(x, y), LAVA, VENT_T);
+  }
+  for (let x = 100; x < 121; x++) vents.push(idx(x, H - 3));
+  for (let y = 95; y < H - 2; y++) for (let x = 85; x < 136; x++) { const i = idx(x, y);
+    if (mat[i] === STONE || mat[i] === ORE) { const dx = (x - 110) / 16, dy = (y - 124) / 15, d = Math.sqrt(dx * dx + dy * dy);
+      T[i] = Math.max(T[i], 900 - (d - 1) * 900); } }
+  // Trees
+  for (const tx of [55, 75, 140, 152, 163]) { const g = ground(tx), h = 6 + (rng() * 4 | 0);
+    for (let k = 1; k <= h; k++) set(idx(tx, g - k), WOOD, 20);
+    for (let j = -3; j <= 2; j++) for (let i = -3; i <= 3; i++) if (i * i + j * j < 10) { const X = tx + i, Y = g - h - 1 + j;
+      if (mat[idx(X, Y)] === AIR) { set(idx(X, Y), PLANT, 20); age[idx(X, Y)] = 2000; } } }
+  // Campfire with a line of dry grass
+  const cf = 62, cg = ground(cf);
+  for (const dx of [-1, 0, 1]) set(idx(cf + dx, cg - 1), WOOD, 20);
+  set(idx(cf, cg - 2), EMBER, 600); life[idx(cf, cg - 2)] = 400;
+  for (let x = cf + 2; x < 74; x++) { const g = ground(x); if (mat[idx(x, g - 1)] === AIR) { set(idx(x, g - 1), PLANT, 20); age[idx(x, g - 1)] = 2000; } }
+  tick = 0;
+}
+
+// ---------- Rendering ----------
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d"), img = ctx.createImageData(W, H), px = img.data;
+let thermal = false, hoverI = -1;
+function glow(t) { const u = Math.min(1, (t - 450) / 800); return [255, 120 + u * 135, 30 + u * 180]; }
+function render() {
+  for (let i = 0; i < N; i++) {
+    const m = mat[i], t = T[i], o = i * 4;
+    let r, g, b;
+    if (thermal) {
+      const u = Math.max(0, Math.min(1, (t + 20) / 1220));
+      r = 255 * Math.min(1, u * 2); g = 255 * Math.max(0, Math.min(1, u * 3 - 1)); b = 255 * Math.max(0, 1 - u * 3) + 255 * Math.max(0, u * 3 - 2);
+      if (m === AIR) { r *= .55; g *= .55; b *= .55; }
+    } else {
+      const c = P[m].col, n = (shade[i] - 128) * (m === AIR ? 0.02 : 0.09);
+      r = c[0] + n; g = c[1] + n; b = c[2] + n;
+      if (m === AIR) { const y = i / W | 0; const s = 1 - y / H * .35; r *= s; g *= s; b *= s; }
+      if (t > 450) { const gc = glow(t), a = Math.min(m === AIR || m === SMOKE ? .95 : .8, (t - 450) / 500);
+        r += (gc[0] - r) * a; g += (gc[1] - g) * a; b += (gc[2] - b) * a; }
+      if (m === EMBER || m === COAL_EMBER) { const f = (shade[i] + tick * 7) % 255 / 255; r = 255; g = 90 + f * 120; b = 30 + f * 40; }
+    }
+    px[o] = r; px[o + 1] = g; px[o + 2] = b; px[o + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+// ---------- Interaction ----------
+const BASE_PALETTE = [STONE, SAND, DIRT, CLAY, WATER, WOOD, SEED, ORE];
+const UNLOCKABLE = [ICE, STEAM, MUD, ASH, CHARCOAL, GLASS, BRICK, METAL];
+let palette = new Set(BASE_PALETTE), paintMat = SAND, tool = "paint", brush = 2, down = false, lastCell = null;
+function unlock(m) { if (UNLOCKABLE.includes(m) && !palette.has(m)) { palette.add(m); drawPalette(); toast(`New material for your palette: ${P[m].name}`); } }
+function drawPalette() {
+  const el = document.getElementById("palette"); el.innerHTML = "";
+  for (const m of [...BASE_PALETTE, ...UNLOCKABLE]) {
+    if (!palette.has(m)) continue;
+    const b = document.createElement("button"); b.className = "swatch" + (m === paintMat && tool === "paint" ? " on" : "");
+    b.innerHTML = `<i style="background:rgb(${P[m].col})"></i>${P[m].name}`;
+    b.onclick = () => { paintMat = m; setTool("paint"); };
+    el.appendChild(b);
+  }
+}
+function setTool(t) { tool = t; document.querySelectorAll("#tools [data-tool]").forEach(b => b.classList.toggle("on", b.dataset.tool === t)); drawPalette(); }
+document.querySelectorAll("#tools [data-tool]").forEach(b => b.onclick = () => setTool(b.dataset.tool));
+document.getElementById("brush").oninput = e => brush = +e.target.value;
+document.getElementById("thermal").onclick = e => { thermal = !thermal; e.target.classList.toggle("on", thermal); };
+let paused = false, speed = 1;
+document.getElementById("pause").onclick = e => { paused = !paused; e.target.textContent = paused ? "Play" : "Pause"; e.target.classList.toggle("on", paused); };
+document.getElementById("speed").onchange = e => speed = +e.target.value;
+
+function applyBrush(cx, cy, t, m, r, record = true) {
+  for (let j = -r + 1; j < r; j++) for (let i = -r + 1; i < r; i++) {
+    if (i * i + j * j >= r * r) continue;
+    const x = cx + i, y = cy + j; if (x < 0 || y < 0 || x >= W || y >= H) continue;
+    const k = idx(x, y); if (mat[k] === BEDROCK) continue;
+    if (t === "paint") { if (mat[k] === AIR || mat[k] === SMOKE || mat[k] === STEAM) set(k, m, Math.max(amb(y), Math.min(T[k], 40))); }
+    else if (t === "dig") { if (mat[k] !== AIR) { energy.dug += T[k] * P[mat[k]].cap; set(k, AIR, amb(y)); } }
+    else if (t === "torch") { if (T[k] < TORCH_MAX) { const e = Math.min(25, (TORCH_MAX - T[k]) * P[mat[k]].cap); T[k] += e / P[mat[k]].cap; energy.torch += e; } }
+  }
+  if (t !== "observe") { markTouched(cx, cy); metrics.strokes++; if (record && recording) recordStroke(cx, cy, t, m, r); }
+}
+function cellFromEvent(e) { const r = cv.getBoundingClientRect();
+  return [Math.floor((e.clientX - r.left) / r.width * W), Math.floor((e.clientY - r.top) / r.height * H)]; }
+cv.addEventListener("pointerdown", e => { cv.setPointerCapture(e.pointerId); down = true; lastCell = cellFromEvent(e);
+  if (pendingRun) { startRun(pendingRun, ...lastCell); pendingRun = null; down = false; } });
+cv.addEventListener("pointermove", e => { lastCell = cellFromEvent(e); const [x, y] = lastCell; hoverI = (x >= 0 && y >= 0 && x < W && y < H) ? idx(x, y) : -1; });
+window.addEventListener("pointerup", () => down = false);
+cv.addEventListener("pointerleave", () => hoverI = -1);
+
+// ---------- Recipes ----------
+let recording = null, recipes = [], pendingRun = null, runs = [];
+const CRAFTED = [CHARCOAL, GLASS, BRICK, METAL, MUD, ASH, ICE];
+function recordStroke(x, y, t, m, r) {
+  if (!recording.origin) { recording.origin = [x, y]; recording.t0 = tick; }
+  recording.strokes.push([tick - recording.t0, t[0], m, x - recording.origin[0], y - recording.origin[1], r]);
+}
+document.getElementById("rec").onclick = e => {
+  if (!recording) { recording = { strokes: [], origin: null }; e.target.textContent = "Stop & save"; e.target.classList.add("on");
+    setRecState("Recording… your first click sets the recipe's anchor point."); return; }
+  const name = document.getElementById("recname").value.trim() || `Recipe ${recipes.length + 1}`;
+  if (recording.strokes.length) { recipes.push({ name, strokes: recording.strokes, history: [], verified: false });
+    metrics.recipesSaved++; if (metrics.firstRecipe === null) metrics.firstRecipe = secs(); setRecState(`Saved “${name}”. Press Run, then click where to run it.`); }
+  else setRecState("Nothing recorded.");
+  recording = null; e.target.textContent = "Record"; e.target.classList.remove("on"); document.getElementById("recname").value = ""; drawRecipes();
+};
+function setRecState(s) { document.getElementById("recstate").textContent = s; }
+const TOOLS = { p: "paint", t: "torch", d: "dig" };
+function countCrafted(x0, y0, x1, y1) { const c = {}; for (let y = Math.max(0, y0); y <= Math.min(H - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(W - 1, x1); x++) {
+  const m = mat[idx(x, y)]; if (CRAFTED.includes(m)) c[m] = (c[m] || 0) + 1; } return c; }
+function startRun(rcp, x, y) {
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const s of rcp.strokes) { x0 = Math.min(x0, x + s[3] - s[5]); x1 = Math.max(x1, x + s[3] + s[5]); y0 = Math.min(y0, y + s[4] - s[5]); y1 = Math.max(y1, y + s[4] + s[5]); }
+  const box = [x0 - 6, y0 - 6, x1 + 6, y1 + 6];
+  runs.push({ rcp, x, y, t0: tick, k: 0, box, before: countCrafted(...box), end: null });
+  metrics.recipeRuns++; setRecState(`Running “${rcp.name}” at 3× speed…`);
+}
+function runRecipes() {
+  for (const r of runs) {
+    const s = r.rcp.strokes;
+    while (r.k < s.length && s[r.k][0] / 3 <= tick - r.t0) { const [, t, m, dx, dy, rad] = s[r.k]; applyBrush(r.x + dx, r.y + dy, TOOLS[t], m, rad, false); r.k++; }
+    if (r.k >= s.length && r.end === null) r.end = tick;
+    if (r.end !== null && tick - r.end >= 600) {
+      const after = countCrafted(...r.box), made = {};
+      let total = 0;
+      for (const m of CRAFTED) { const d = (after[m] || 0) - (r.before[m] || 0); if (d > 0) { made[m] = d; total += d; } }
+      r.rcp.history.push({ total, made }); if (total > 0) r.rcp.verified = true;
+      setRecState(`“${r.rcp.name}” made ${total ? Object.entries(made).map(([m, d]) => `${d} ${P[m].name.toLowerCase()}`).join(", ") : "nothing new"}.`);
+      r.done = true; drawRecipes();
+    }
+  }
+  runs = runs.filter(r => !r.done);
+}
+function drawRecipes() {
+  const ul = document.getElementById("recipes"); ul.innerHTML = "";
+  recipes.forEach((r, n) => {
+    const li = document.createElement("li"), h = r.history.map(x => x.total), best = h.length ? Math.max(...h) : null;
+    li.innerHTML = `<div class="row"><b>${esc(r.name)}</b><span class="small">${r.strokes.length} steps · ${r.verified ? "verified here" : "unverified here"}${best !== null ? ` · last ${h[h.length - 1]}, best ${best} (${h.length} runs)` : ""}</span></div>`;
+    const row = document.createElement("div"); row.className = "row";
+    const run = document.createElement("button"); run.textContent = "Run"; run.onclick = () => { pendingRun = r; setRecState(`Click the world where “${r.name}” should run.`); };
+    const exp = document.createElement("button"); exp.textContent = "Copy code"; exp.onclick = () => { const code = btoa(JSON.stringify({ n: r.name, s: r.strokes }));
+      navigator.clipboard?.writeText(code).then(() => setRecState("Recipe code copied."), () => setRecState(code)); };
+    row.append(run, exp); li.appendChild(row); ul.appendChild(li);
+  });
+}
+document.getElementById("importbtn").onclick = () => {
+  try { const o = JSON.parse(atob(document.getElementById("importbox").value.trim()));
+    if (!Array.isArray(o.s)) throw 0; recipes.push({ name: String(o.n || "Imported"), strokes: o.s, history: [], verified: false });
+    document.getElementById("importbox").value = ""; drawRecipes(); setRecState("Imported — unverified until it works in this world."); }
+  catch { setRecState("That code could not be read."); }
+};
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// ---------- Snapshots ----------
+const snaps = [null, null, null];
+function drawSnaps() {
+  const el = document.getElementById("snaps"); el.innerHTML = "";
+  snaps.forEach((s, n) => {
+    const a = document.createElement("button"); a.textContent = `Save ${n + 1}`;
+    a.onclick = () => { snaps[n] = { mat: mat.slice(), T: T.slice(), life: life.slice(), age: age.slice(), shade: shade.slice(), at: secs() }; metrics.snapshotsSaved++; drawSnaps(); };
+    const b = document.createElement("button"); b.textContent = s ? `Load ${n + 1} (${s.at}s)` : `Load ${n + 1}`; b.disabled = !s;
+    b.onclick = () => { mat.set(s.mat); T.set(s.T); life.set(s.life); age.set(s.age); shade.set(s.shade); metrics.snapshotsLoaded++; };
+    el.append(a, b);
+  });
+}
+
+// ---------- Journal, goals, metrics ----------
+function drawJournal() {
+  const ul = document.getElementById("journal"); ul.innerHTML = "";
+  const seen = RX.filter(r => r.first !== null).sort((a, b) => (b.caused > 0) - (a.caused > 0) || a.first - b.first);
+  for (const r of seen) {
+    const law = r.caused > 0, tr = r.tmin === r.tmax ? `${Math.round(r.tmin)}°` : `${Math.round(r.tmin)}–${Math.round(r.tmax)}°`;
+    const li = document.createElement("li");
+    const temp = NON_THERMAL.has(r.id) ? "" : ` · observed at ${tr}`;
+    li.innerHTML = `<span class="tag ${law ? "law" : "rumor"}">${law ? "LAW" : "?"}</span>${r.name}<div class="small">${law ? "You caused this" : "Seen, not yet caused by you"}${temp} · ${r.seen}×</div>`;
+    ul.appendChild(li);
+  }
+  const laws = seen.filter(r => r.caused > 0).length;
+  document.getElementById("jsum").textContent = `${laws} laws · ${seen.length - laws} observations · ${RX.length - seen.length} reactions not yet seen`;
+  const goals = document.getElementById("goals"); goals.innerHTML = "";
+  for (const m of UNLOCKABLE) { const s = document.createElement("span"); const done = palette.has(m);
+    s.className = "goal" + (done ? " done" : ""); s.textContent = done ? `✓ ${P[m].name}` : "? ???"; goals.appendChild(s); }
+  journalDirty = false;
+}
+function drawMetrics() {
+  const f = v => v === null ? "—" : `${v}s`;
+  document.getElementById("metrics").innerHTML =
+    `Time ${secs()}s · first reaction seen ${f(metrics.firstSeen)} · first caused ${f(metrics.firstCaused)} · first recipe ${f(metrics.firstRecipe)}<br>` +
+    `Player-caused reactions ${metrics.causedEvents} · recipes ${metrics.recipesSaved} · runs ${metrics.recipeRuns} · snapshots ${metrics.snapshotsSaved}<br>` +
+    `Energy in — torch ${Math.round(energy.torch)} · chemistry ${Math.round(energy.chemistry)} · deep earth ${Math.round(energy.deepEarth)} · sky exchange ${Math.round(energy.sky)}`;
+}
+document.getElementById("export").onclick = () => {
+  const box = document.getElementById("exportbox"); box.hidden = false;
+  box.value = JSON.stringify({ seed, tier, shiftedKeys, seconds: secs(), metrics, energy,
+    reactions: RX.map(r => ({ id: r.id, seen: r.seen, caused: r.caused, first: r.first })),
+    recipes: recipes.map(r => ({ name: r.name, steps: r.strokes.length, runs: r.history })) }, null, 1);
+  box.select();
+};
+let toastTimer = 0;
+function toast(s) { const el = document.getElementById("status"); el.textContent = s; toastTimer = 180; }
+function drawStatus() {
+  if (toastTimer > 0) { toastTimer--; return; }
+  const el = document.getElementById("status");
+  if (hoverI < 0) { el.textContent = "Hover to observe."; return; }
+  el.textContent = `${P[mat[hoverI]].name} · ${Math.round(T[hoverI])}°  (x ${hoverI % W}, y ${hoverI / W | 0})`;
+}
+
+// ---------- Worlds and tiers ----------
+const SHIFTABLE = ["boil", "woodIgnite", "woodFlame", "coalIgnite", "coalFlame", "sandMelt", "clayFire", "oreSmelt"];
+function viable(c) {
+  return c.freeze < c.boil - 30 && c.boil < TORCH_MAX - 40 && c.woodIgnite < TORCH_MAX - 20 &&
+    c.woodFlame > c.woodIgnite + 150 && c.woodFlame > c.coalIgnite + 50 && c.coalFlame > c.oreSmelt + 50 &&
+    c.coalFlame > c.sandMelt + 50 && Math.max(c.woodFlame, c.coalFlame) > c.clayFire + 50 &&
+    c.clayFire > TORCH_MAX + 100 && c.sandMelt > TORCH_MAX + 200 && c.oreSmelt > TORCH_MAX + 200;
+}
+function makeConstants() {
+  C = { ...BASE }; shiftedKeys = [];
+  if (tier === 0) return;
+  const r = mulberry32(seed * 7919);
+  for (let tries = 0; tries < 500; tries++) {
+    const c = { ...BASE }, keys = SHIFTABLE.slice().sort(() => r() - .5).slice(0, 4);
+    for (const k of keys) c[k] = Math.round(BASE[k] * (0.7 + r() * 0.6));
+    if (viable(c)) { C = c; shiftedKeys = keys; return; }
+  }
+}
+function newWorld() {
+  tier = +document.getElementById("tier").value;
+  seed = parseInt(document.getElementById("seed").value, 10) || (Math.random() * 1e6 | 0);
+  document.getElementById("seed").value = seed;
+  makeConstants(); generate();
+  for (const r of RX) Object.assign(r, { seen: 0, caused: 0, tmin: Infinity, tmax: -Infinity, first: null });
+  Object.assign(metrics, { firstSeen: null, firstCaused: null, firstLaw: null, firstRecipe: null, recipeRuns: 0, causedEvents: 0, strokes: 0 });
+  for (const k in energy) energy[k] = 0;
+  touched.fill(-1e9); palette = new Set(BASE_PALETTE); runs = [];
+  for (const r of recipes) r.verified = false;
+  document.getElementById("tierinfo").textContent = tier ? "Four constants differ from the standard world. Your journal's measured temperatures will reveal them." : "Standard natural-science constants.";
+  document.getElementById("revealed").textContent = "";
+  drawPalette(); drawRecipes(); journalDirty = true;
+}
+document.getElementById("newworld").onclick = () => { document.getElementById("seed").value = ""; newWorld(); };
+document.getElementById("reveal").onclick = () => {
+  document.getElementById("revealed").textContent = shiftedKeys.length ? shiftedKeys.map(k => `${k}: ${C[k]} (standard ${BASE[k]})`).join(" · ") : "Nothing is shifted in this world.";
+};
+
+// ---------- Main loop ----------
+let acc = 0, last = performance.now(), uiTick = 0;
+function loop(now) {
+  const dt = Math.min(100, now - last); last = now;
+  if (!paused) {
+    acc += dt * speed;
+    let steps = 0;
+    while (acc >= 1000 / 60 && steps < 8) { step(); acc -= 1000 / 60; steps++; }
+    if (steps === 8) acc = 0;
+  }
+  if (down && lastCell && tool !== "observe" && !paused) applyBrush(lastCell[0], lastCell[1], tool, paintMat, brush);
+  render();
+  drawStatus();
+  if (++uiTick % 15 === 0) { if (journalDirty) drawJournal(); drawMetrics(); }
+  requestAnimationFrame(loop);
+}
+window.WORLD = { step, mat, T, P, RX, C: () => C, energy, metrics, applyBrush, idx, generate, M: { AIR, STONE, SAND, WATER, WOOD, CHARCOAL, ORE, METAL, GLASS, CLAY, BRICK, PLANT, STEAM, ICE, LAVA }, setSeed: s => { seed = s; } };
+drawSnaps(); newWorld();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

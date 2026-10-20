@@ -5,6 +5,10 @@ Early-stage game design project.
 ## Design
 - [01 — Design pillars and decision log](docs/design/01-pillars.md)
 - [02 — MVP ruleset: 2D natural science](docs/design/02-ruleset-mvp.md)
+- [03 — Prototype 0 plan](docs/design/03-prototype-plan.md)
+
+## Prototype
+- [prototype/index.html](prototype/index.html) — open in any browser; no build step.
 
 ## Research
 - [01 — Gameplay loops research plan](docs/research/01-gameplay-loops.md)
