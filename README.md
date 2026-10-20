@@ -9,6 +9,7 @@ Early-stage game design project.
 
 ## Prototype
 - [prototype/index.html](prototype/index.html) — open in any browser; no build step.
+- [Playtest 01 notes](docs/playtests/2026-10-20-playtest-01.md)
 
 ## Research
 - [01 — Gameplay loops research plan](docs/research/01-gameplay-loops.md)

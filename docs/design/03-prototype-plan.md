@@ -1,6 +1,6 @@
 # Prototype 0 — "Is discovery fun?"
 
-Status: v0 built 2026-10-20 — [prototype/index.html](../../prototype/index.html). Throwaway: it exists to answer one question, and its code is not the production base (D12).
+Status: v0.2 built 2026-10-20 after [playtest 01](../playtests/2026-10-20-playtest-01.md) — [prototype/index.html](../../prototype/index.html). Throwaway: it exists to answer one question, and its code is not the production base (D12).
 
 ## The question
 
