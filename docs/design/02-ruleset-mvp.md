@@ -30,7 +30,10 @@ This is the smallest set I think still produces interesting combinations. Every 
 | P9 | **Humidity** (water vapour in air; saturation rises steeply with temperature) | Evaporation, clouds, rain, plant water use | Moist air rising up a mountain cools, clouds form, and it rains; the far side stays dry |
 | P10 | **Wind** (a prevailing air flow, deflected upward by terrain) | Where moisture goes | Ocean air brings rain to the windward slope and leaves a rain shadow behind |
 
-P9 and P10 were added in prototype v0.3 (2026-10-20), after playtest 01 asked how mountains, forests and deserts shape the climate. Water is conserved through the whole cycle: ocean inflow, evaporation, plants releasing vapour, cloud, rain, soaking into soil, and drying out. Raindrops can be partial cells, and they merge when they touch.
+| P11 | **Soil water** (each kind of ground holds a different amount and drains at a different speed) | Infiltration, drainage, drying, mud | Rain soaks into dirt and runs straight through sand; soaked dirt turns to mud |
+| P12 | **Life with traits** (species differ in water need, thirst tolerance, height and seeding) | Which plants grow where, succession | Wild seeds become cacti on dryish sand, grass on damp ground, trees on wet dirt; dead plants and roots make soil |
+
+P9 and P10 were added in prototype v0.3 (2026-10-20), after playtest 01 asked how mountains, forests and deserts shape the climate. Water is conserved through the whole cycle: ocean inflow, evaporation, plants releasing vapour, cloud, rain, soaking into soil, and drying out. Raindrops can be partial cells, and they merge when they touch. P11 and P12 were added in v0.4 (plants and soil), after playtest 04: "plants are fun, let's do more".
 
 **Conservation (from section 4 of the pillars doc):** heat energy is conserved inside the simulation. It enters only through P8 and leaves only through slow radiation into the sky. Every reaction in P6 declares its energy change explicitly. This is the main balance lever (D3).
 

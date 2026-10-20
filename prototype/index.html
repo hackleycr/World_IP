@@ -92,7 +92,7 @@ label { font-size: 13px; }
 </head>
 <body>
 <header>
-  <h1>World IP Prototype 0.3.1</h1>
+  <h1>World IP Prototype 0.4</h1>
   <p>Experiment with the world. Every reaction you notice goes in the journal; every one you cause becomes a law.</p>
 </header>
 <main>
@@ -103,7 +103,7 @@ label { font-size: 13px; }
       <div id="tip" hidden></div>
       <div id="disc" hidden role="status"></div>
     </div>
-    <div class="gauge"><span class="small">Rain gauge: recent rain in each column<span id="gaugepeak"></span></span><canvas id="raingauge" aria-label="Rain gauge"></canvas></div>
+    <div class="gauge"><div class="row"><span class="small">Rain gauge: rain in each column over the last 60 s<span id="gaugepeak"></span></span><button id="gaugereset" class="small">Reset gauge</button></div><canvas id="raingauge" aria-label="Rain gauge"></canvas></div>
     <div id="legend" hidden><div class="bar" id="legendbar"></div><div class="ticks" id="legendticks"></div></div>
     <div class="status" id="status">Hover over the world to read temperature and altitude.</div>
     <div class="bar" id="tools">
@@ -113,7 +113,7 @@ label { font-size: 13px; }
       <button data-tool="observe">Observe</button>
       <label>Brush <input id="brush" type="range" min="1" max="7" value="2"></label>
       <button id="thermal" title="Instrument: shows temperature">Thermal view</button>
-      <button id="humview" title="Instrument: shows how close the air is to saturation">Humidity view</button>
+      <button id="humview" title="Instrument: air humidity, and how much water the ground holds">Water view</button>
       <button id="pause">Pause</button>
       <select id="speed" aria-label="Speed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
     </div>
@@ -160,7 +160,9 @@ label { font-size: 13px; }
           <li>What happens to the valley's rain if you flatten the mountain, or build a new one?</li>
           <li>Does a forest make the air downwind wetter? Plant seeds by water and watch the humidity view.</li>
           <li>What happens to plants when the wind stops bringing ocean air?</li>
-          <li>Can you make the desert bloom?</li>
+          <li>Water the desert. What grows first, and what comes after?</li>
+          <li>Which plants grow on sand, on dirt, and on mud? Why?</li>
+          <li>What happens to a forest if the rain stops? To a cactus if you flood it?</li>
         </ul>
       </details>
     </section>
@@ -196,7 +198,7 @@ label { font-size: 13px; }
 const W = 240, H = 135, N = W * H;
 const AIR=0, STONE=1, SAND=2, DIRT=3, MUD=4, CLAY=5, WATER=6, ICE=7, STEAM=8, WOOD=9, PLANT=10, SEED=11,
       EMBER=12, COAL_EMBER=13, ASH=14, LAVA=15, ORE=16, METAL=17, GLASS=18, BRICK=19, CHARCOAL=20,
-      SMOKE=21, MGLASS=22, BEDROCK=23;
+      SMOKE=21, MGLASS=22, BEDROCK=23, GRASS=24, CACTUS=25, SOIL=26;
 const GAS=0, POWDER=1, LIQUID=2, SOLID=3;
 const P = [];
 function def(id, name, phase, dens, k, cap, col) { P[id] = { name, phase, dens, k, cap, col }; }
@@ -225,6 +227,19 @@ def(CHARCOAL, "Charcoal",     SOLID,  9,    .08,  .7,  [40, 38, 38]);
 def(SMOKE,    "Smoke",        GAS,    .1,   .02,  .3,  [96, 92, 90]);
 def(MGLASS,   "Molten glass", LIQUID, 2.4,  .15,  .8,  [255, 160, 60]);
 def(BEDROCK,  "Bedrock",      SOLID,  99,   .002, 1,   [40, 36, 40]);
+def(GRASS,    "Grass",        SOLID,  9,    .08,  1.2, [128, 178, 66]);
+def(CACTUS,   "Cactus",       SOLID,  9,    .1,   1.5, [64, 128, 96]);
+def(SOIL,     "Soil",         POWDER, 1.3,  .12,  1.1, [66, 46, 30]);
+// Ground that holds water: how much (in water-cell units) a cell can hold, and how fast it drains downward.
+const CAPA = new Float32Array(32), DRAIN = new Float32Array(32);
+CAPA[SAND] = .25; DRAIN[SAND] = .2; CAPA[DIRT] = .5; DRAIN[DIRT] = .06; CAPA[SOIL] = .7; DRAIN[SOIL] = .05; CAPA[MUD] = 1; DRAIN[MUD] = .03;
+// Plant species. need: wettest root-zone fraction they can drink from; thirst: water checks they survive without it.
+const SPECIES = {
+  [GRASS]:  { name: "Grass",  need: .06, drink: .01,  height: [1, 3],  grow: .01,  seedRate: .0004, spread: 7, burn: 40,  thirst: 120 },
+  [CACTUS]: { name: "Cactus", need: .01, drink: .002, height: [2, 5],  grow: .003, seedRate: .0002, spread: 5, burn: 120, thirst: 3000, drowns: true },
+  [PLANT]:  { name: "Tree",   need: .2,  drink: .03,  height: [6, 11], grow: .004, seedRate: .00004, spread: 5, burn: 90, thirst: 200 },
+};
+const SPROUT_ID = { [GRASS]: "sprout_grass", [CACTUS]: "sprout_cactus", [PLANT]: "sprout_tree" };
 
 const BASE = { freeze: 0, boil: 100, woodIgnite: 280, woodFlame: 700, coalIgnite: 400, coalFlame: 1200,
                sandMelt: 1000, clayFire: 500, oreSmelt: 900, lavaSolid: 800, stoneMelt: 1300, mudDry: 100 };
@@ -238,7 +253,12 @@ let mat = new Uint8Array(N), T = new Float32Array(N), life = new Float32Array(N)
     moist = new Float32Array(N);
 // Vapour an air cell can hold before it saturates: rises steeply with temperature.
 const sat = t => 0.03 * Math.exp(0.055 * Math.max(-40, Math.min(t, 120)));
-const RAIN_AT = 0.3;   // cloud water in one cell that falls as a (partial) raindrop
+const RAIN_AT = 0.3;
+// Rain gauge memory: one bin per column per second for the last 60 s, so old rain drops out on its own.
+const RAIN_SECS = 60, rainBins = new Float32Array(RAIN_SECS * W);
+let rainSec = -1;
+function rainBin() { const sNow = Math.floor(tick / 60) % RAIN_SECS; if (sNow !== rainSec) { rainSec = sNow; rainBins.fill(0, sNow * W, sNow * W + W); } return sNow * W; }
+function rainTotals() { const r = climate.rainCol; r.fill(0); for (let k = 0; k < RAIN_SECS; k++) for (let x = 0; x < W; x++) r[x] += rainBins[k * W + x]; return r; }   // cloud water in one cell that falls as a (partial) raindrop
 const LVAP = 60;
 const climate = { windDir: -1, wind: 1, oceanRH: 0.85, rainCol: new Float32Array(W),
                   water: { inflow: 0, outflow: 0, evaporated: 0, transpired: 0, rained: 0 } };
@@ -268,20 +288,24 @@ const RX = [
   ["clay_fire", "Clay fires into brick", BRICK], ["lava_cool", "Lava cools into stone", STONE],
   ["stone_melt", "Stone melts into lava", LAVA], ["smelt", "Ore touching charcoal, heated, gives metal", METAL],
   ["wet_dirt", "Water soaks dirt into mud", MUD], ["dry_mud", "Mud dries back into dirt", DIRT],
-  ["sprout", "A seed sprouts", PLANT], ["lignify", "Old plant stems turn to wood", WOOD],
+  ["sprout_grass", "Grass sprouts from a seed", null], ["sprout_cactus", "A cactus sprouts from a seed", null],
+  ["sprout_tree", "A tree sprouts from a seed", null], ["lignify", "Old plant stems turn to wood", WOOD],
   ["seed_burn", "Seeds burn to ash", ASH],
   ["evaporate", "Water evaporates into the air", null], ["cloud", "Moist air cools into cloud", null],
   ["rain", "Clouds rain", null], ["transpire", "Plants breathe water vapour into the air", null],
-  ["wilt", "Plants without water wilt and rot into soil", null],
+  ["wilt", "Plants without water die and rot into soil", SOIL], ["soak", "Ground soaks up water", null],
+  ["seed_drop", "Plants drop seeds that land downwind", null], ["soil_form", "Plants and ash turn sand or dirt into soil", SOIL],
+  ["rot", "Plants rot under water, and cacti in waterlogged ground", SOIL],
 ].map(([id, name, prod]) => ({ id, name, prod, seen: 0, caused: 0, tmin: Infinity, tmax: -Infinity, first: null }));
 const RXI = Object.fromEntries(RX.map((r, i) => [r.id, i]));
 const SHORT = { boil: "Water → steam", condense: "Steam → water", freeze: "Water → ice", melt: "Ice → water",
   ignite_wood: "Wood ignites", ignite_plant: "Plant ignites", burnout: "Fire → ash", smother: "No air: fire → charcoal",
   quench: "Water: fire → charcoal", pyrolysis: "Hot wood, no air → charcoal", ignite_coal: "Charcoal ignites (hotter!)",
   sand_melt: "Sand melts", glass_set: "→ Glass", clay_fire: "Clay → brick", lava_cool: "Lava → stone", stone_melt: "Stone melts",
-  smelt: "Ore → metal", wet_dirt: "Dirt + water → mud", dry_mud: "Mud dries", sprout: "Seed sprouts", lignify: "Plant → wood",
+  smelt: "Ore → metal", wet_dirt: "Dirt + water → mud", dry_mud: "Mud dries", sprout_grass: "Grass sprouts", sprout_cactus: "Cactus sprouts", sprout_tree: "Tree sprouts", lignify: "Plant → wood",
   seed_burn: "Seed burns", evaporate: "Water evaporates", cloud: "Cloud forms", rain: "Rain",
-  transpire: "Plant breathes out vapour", wilt: "Plant wilts" };
+  transpire: "Plant breathes out vapour", wilt: "Plant dies → soil", soak: "Ground soaks up water",
+  seed_drop: "Seed dropped", soil_form: "→ Soil", rot: "Plant rots" };
 // Three hints per material, from a nudge to the answer. The player chooses when to ask.
 const HINTS = {
   [ICE]: ["Ice already exists somewhere in this world. Where is it?", "Hover around: the air gets colder the higher you go.",
@@ -297,9 +321,18 @@ const HINTS = {
   [METAL]: ["Ore needs the hottest fire you can make, and something touching it.", "Ore needs carbon from burnt wood, touching it.",
             "Put ore directly against charcoal, then light the charcoal with a wood fire."],
 };
+HINTS[SOIL] = ["Plants change the ground they grow in.", "Dead plants rot into something richer than dirt, and grass roots work on sand.",
+  "Let grass grow on watered sand for a while, or let some plants die of thirst."];
+const LIVING = [GRASS, CACTUS, PLANT];
+const LIVING_HINTS = {
+  [GRASS]: ["Seeds need damp ground.", "Grass is the least fussy plant: almost any damp ground will do.", "Drop seeds on damp dirt, or on sand that has had some water."],
+  [CACTUS]: ["Some plants like it dry.", "Try seeds on sand with only a little water.", "Drop seeds on desert sand and add a few drops of water: not too much."],
+  [PLANT]: ["Trees are thirsty.", "They need dirt or soil that stays wet.", "Drop seeds on muddy ground next to the pond."],
+};
 const hintLevel = {};
 // Reactions whose trigger is not a temperature: the journal does not show a measured temperature for these.
-const NON_THERMAL = new Set(["wet_dirt", "sprout", "lignify", "quench", "smother", "rain", "transpire", "wilt"]);
+const NON_THERMAL = new Set(["wet_dirt", "dry_mud", "sprout_grass", "sprout_cactus", "sprout_tree", "lignify", "quench", "smother",
+  "rain", "transpire", "wilt", "soak", "seed_drop", "soil_form", "rot"]);
 let journalDirty = true;
 
 // Player activity map: 8x8 blocks, last tick the player acted there. Used to tell player-caused events.
@@ -425,7 +458,14 @@ function react(x, y, i, m) {
     case WATER:
       if (t > C.boil) { life[i] += (t - C.boil) * 2; T[i] = C.boil; if (life[i] >= LV) { ev("boil", i, C.boil); mat[i] = STEAM; T[i] = C.boil; life[i] = 0; } }
       else if (t < C.freeze) { life[i] -= (C.freeze - t) * 2; T[i] = C.freeze; if (life[i] <= -LF) { ev("freeze", i, C.freeze); mat[i] = ICE; T[i] = C.freeze; life[i] = 0; } }
-      if (rng() < 0.002) { const j = hasNeighbor(x, y, n => n === DIRT); if (j >= 0) { ev("wet_dirt", j, T[j]); const lost = moist[i]; morph(j, MUD); moist[j] = lost; set(i, AIR, T[i]); break; } }
+      // Water soaks into ground below or beside it that still has room (sand, dirt, soil, mud).
+      for (const j of [i + W, x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1]) {
+        if (j < 0 || j >= N) continue; const cj = CAPA[mat[j]]; if (cj <= 0 || moist[j] >= cj) continue;
+        const q = Math.min(0.02, cj - moist[j], 1 - moist[i]); moist[j] += q; moist[i] += q;
+        if (rng() < 0.003) ev("soak", j, T[j]);
+        if (moist[i] >= 0.999) { mat[i] = AIR; T[i] = amb(y); life[i] = 0; moist[i] = 0; break; }
+      }
+      if (mat[i] !== WATER) break;
       if (moist[i] > 0.001) {   // a partial cell (raindrop) pours its water into a partial neighbour below or beside it
         for (const j of [i + W, i - 1, i + 1]) { if (j < 0 || j >= N || mat[j] !== WATER || moist[j] <= 0.001) continue;
           const t2 = Math.min(1 - moist[i], moist[j]); moist[j] -= t2; moist[i] += t2;
@@ -440,17 +480,24 @@ function react(x, y, i, m) {
     case STEAM:
       if (t < C.boil) { life[i] += (C.boil - t) * .5; T[i] = C.boil; if (life[i] >= LV) { ev("condense", i, C.boil); mat[i] = WATER; T[i] = C.boil; life[i] = 0; } }
       break;
-    case MUD:
-      // Drying gives the water back as steam, so water is conserved through the mud cycle.
-      if (t >= C.mudDry) { const a = hasNeighbor(x, y, n => n === AIR);
-        if (a >= 0) { ev("dry_mud", i, t); morph(i, DIRT); mat[a] = STEAM; life[a] = 0; } break; }
-      if (evaporate(x, y, i, 0.0004, P[MUD].cap)) { ev("dry_mud", i, t); morph(i, DIRT); }
+    case MUD: case DIRT: case SOIL:
+      soilStep(x, y, i, m);
+      if (m === DIRT && rng() < 0.0003 && y > 0 && (mat[i - W] === GRASS || mat[i - W] === PLANT) && within(x, y, 2, ASH)) {
+        ev("soil_form", i, t); const w = moist[i]; morph(i, SOIL); moist[i] = w; }
+      break;
+    case ASH:   // ash resting on damp sand or dirt enriches it into soil
+      if (y + 1 < H && (mat[i + W] === SAND || mat[i + W] === DIRT) && moist[i + W] > 0.05 && rng() < 0.002) {
+        const b = i + W, w = moist[b]; ev("soil_form", b, T[b]); morph(b, SOIL); moist[b] = w; set(i, AIR, T[i]); }
       break;
     case CLAY:
       if (t >= C.clayFire) { ev("clay_fire", i, t); morph(i, BRICK); }
       break;
     case SAND:
-      if (t >= C.sandMelt) { ev("sand_melt", i, t); morph(i, MGLASS); }
+      if (t >= C.sandMelt) { ev("sand_melt", i, t); morph(i, MGLASS); break; }
+      soilStep(x, y, i, m);
+      // Roots of grass or cacti, given water, slowly turn sand into soil.
+      if (moist[i] > 0.03 && y > 0 && (mat[i - W] === GRASS || mat[i - W] === CACTUS) && rng() < 0.0006) {
+        ev("soil_form", i, t); const w = moist[i]; morph(i, SOIL); moist[i] = w; }
       break;
     case MGLASS:
       if (t < C.sandMelt - 100) { ev("glass_set", i, t); morph(i, GLASS); }
@@ -470,16 +517,12 @@ function react(x, y, i, m) {
         else if (rng() < 0.02) { ev("pyrolysis", i, t); morph(i, CHARCOAL); }
       }
       break;
-    case PLANT:
-      if (t >= C.woodIgnite - 30 && hasNeighbor(x, y, isAirish) >= 0) { ev("ignite_plant", i, t); morph(i, EMBER); life[i] = 90; break; }
-      growPlant(x, y, i);
-      if (mat[i] === PLANT) transpire(x, y, i);
+    case PLANT: case GRASS: case CACTUS:
+      plantStep(x, y, i, m);
       break;
     case SEED:
       if (t >= 200) { ev("seed_burn", i, t); morph(i, ASH); break; }
-      if (y + 1 < H && (mat[i + W] === DIRT || mat[i + W] === MUD) && rng() < 0.01 && (within(x, y, 3, WATER) || within(x, y, 3, MUD))) {
-        ev("sprout", i, t); morph(i, PLANT); life[i] = 5 + (rng() * 6 | 0) + (within(x, y, 2, ASH) ? 5 : 0); age[i] = within(x, y, 2, ASH) ? 3 : 1;
-      }
+      germinate(x, y, i);
       break;
     case CHARCOAL:
       if (t >= C.coalIgnite && hasNeighbor(x, y, n => n === AIR) >= 0 && hasNeighbor(x, y, n => n === WATER) < 0) { ev("ignite_coal", i, t); morph(i, COAL_EMBER); life[i] = 600; }
@@ -507,13 +550,93 @@ function burn(x, y, i, m) {
   if (y > 0 && mat[i - W] === AIR && rng() < 0.04) { mat[i - W] = SMOKE; life[i - W] = 60 + rng() * 60; }
   if ((life[i] -= 1) <= 0) { ev("burnout", i, T[i]); morph(i, ASH); }
 }
-function growPlant(x, y, i) {
-  if (age[i] < 65000) age[i]++;
-  if (life[i] > 0 && y > 0 && mat[i - W] === AIR && rng() < 0.004 * (age[i] % 4 === 3 ? 3 : 1)) {
-    const a = i - W; mat[a] = PLANT; T[a] = T[i]; life[a] = life[i] - 1; age[a] = 0; shade[a] = rng() * 255; life[i] = 0;
-  } else if (life[i] === 0 && age[i] > 1500 && y > 0 && mat[i - W] === PLANT && rng() < 0.001) {
-    ev("lignify", i, T[i]); morph(i, WOOD);
+// ---------- Soil water and plants ----------
+function soilStep(x, y, i, m) {
+  const cap = CAPA[m];
+  // Drain down into drier ground; spread a little sideways.
+  if (y + 1 < H) { const b = i + W, cb = CAPA[mat[b]];
+    if (cb > 0) { const fi = moist[i] / cap, fb = moist[b] / cb;
+      if (fi > fb) { const q = Math.min(DRAIN[m] * (fi - fb) * Math.min(cap, cb), moist[i], cb - moist[b]); moist[i] -= q; moist[b] += q; } } }
+  const d = (tick + y) & 1 ? 1 : -1, X = x + d;
+  if (X >= 0 && X < W) { const j = i + d, cj = CAPA[mat[j]];
+    if (cj > 0) { const fi = moist[i] / cap, fj = moist[j] / cj;
+      if (fi > fj) { const q = Math.min(0.02 * (fi - fj) * Math.min(cap, cj), cj - moist[j]); moist[i] -= q; moist[j] += q; } } }
+  // Evaporate from the surface; boil off fast when hot.
+  if (y > 0 && mat[i - W] === AIR && moist[i] > 0) {
+    const a = i - W, s = sat(T[i]);
+    const e = T[i] >= C.mudDry ? Math.min(moist[i], 0.02) : moist[a] < s ? Math.min(0.0004 * (s - moist[a]) * (moist[i] / cap), 0.0002, moist[i]) : 0;
+    if (e > 0) { moist[a] += e; moist[i] -= e; T[i] -= e * LVAP / P[m].cap; climate.water.evaporated += e; }
   }
+  // Soaked dirt becomes mud; drying mud becomes dirt (the water stays in the cell).
+  if (m === DIRT && moist[i] > 0.45 && rng() < 0.02) { ev("wet_dirt", i, T[i]); const w = moist[i]; morph(i, MUD); moist[i] = w; }
+  else if (m === MUD && moist[i] < 0.35 && rng() < 0.02) { ev("dry_mud", i, T[i]); const w = moist[i]; morph(i, DIRT); moist[i] = w; }
+}
+// The wettest ground a plant's roots reach: down through the plant to the ground, then a few cells around and below.
+function rootSoil(x, y) {
+  let gy = y + 1;
+  while (gy < H && gy < y + 24) { const m = mat[idx(x, gy)]; if (m === PLANT || m === WOOD || m === GRASS || m === CACTUS || m === AIR || m === SEED) gy++; else break; }
+  let best = -1, bf = -1;
+  for (let j = gy; j < Math.min(H, gy + 4); j++) for (let k = -2; k <= 2; k++) { const X = x + k; if (X < 0 || X >= W) continue;
+    const q = idx(X, j), c = CAPA[mat[q]]; if (c > 0 && moist[q] / c > bf) { bf = moist[q] / c; best = q; } }
+  return best;
+}
+function plantStep(x, y, i, m) {
+  const sp = SPECIES[m];
+  if (T[i] >= (m === GRASS ? C.woodIgnite - 60 : C.woodIgnite - 30) && hasNeighbor(x, y, isAirish) >= 0) {
+    ev("ignite_plant", i, T[i]); morph(i, EMBER); life[i] = sp.burn; return; }
+  if (age[i] < 65000) age[i]++;
+  // Grow upward; a tree's tip spreads into a canopy when it stops growing.
+  if (life[i] > 0 && y > 0 && mat[i - W] === AIR && rng() < sp.grow) {
+    const a = i - W; mat[a] = m; T[a] = T[i]; life[a] = life[i] - 1; age[a] = 0; moist[a] = 0; shade[a] = rng() * 255; life[i] = 0;
+    if (m === PLANT && life[a] === 0) for (let j = -2; j <= 1; j++) for (let k = -2; k <= 2; k++) { if (k * k + j * j > 5) continue;
+      const X = x + k, Y = y - 1 + j; if (X < 0 || X >= W || Y < 0) continue; const q = idx(X, Y);
+      if (mat[q] === AIR) { mat[q] = PLANT; T[q] = T[a]; life[q] = 0; age[q] = 400; moist[q] = 0; shade[q] = rng() * 255; } }
+    return;
+  }
+  if (m === PLANT && life[i] === 0 && age[i] > 1500 && y > 0 && mat[i - W] === PLANT && rng() < 0.001) { ev("lignify", i, T[i]); morph(i, WOOD); return; }
+  // Drink: roots take water; leaves with open air above breathe it out as vapour.
+  if (rng() < 0.05) {
+    const src = rootSoil(x, y), f = src >= 0 ? moist[src] / CAPA[mat[src]] : 0;
+    const under = y > 0 && mat[i - W] === WATER;
+    if (under || (sp.drowns && f > 0.9)) { if ((moist[i] += 1) > (under ? 300 : 600)) { ev("rot", i, T[i]); morph(i, SOIL); } return; }
+    if (src >= 0 && f >= sp.need) {
+      moist[i] = 0;
+      const take = Math.min(sp.drink * 0.05, moist[src]);
+      if (y > 0 && mat[i - W] === AIR && moist[i - W] < sat(T[i - W])) {
+        moist[src] -= take; moist[i - W] += take; climate.water.transpired += take; if (rng() < 0.003) ev("transpire", i, T[i]); }
+    } else if ((moist[i] += 1) > sp.thirst) { ev("wilt", i, T[i]); morph(i, SOIL); return; }
+  }
+  // Mature plants drop seeds from their tops, mostly downwind.
+  if (life[i] === 0 && age[i] > 600 && y > 0 && mat[i - W] === AIR && rng() < sp.seedRate) {
+    const dir = climate.windDir !== 0 && rng() < 0.7 ? climate.windDir : (rng() < 0.5 ? -1 : 1);
+    const X = x + dir * (1 + (rng() * sp.spread | 0)), Y = y - 1;
+    if (X >= 0 && X < W && Y >= 0 && mat[idx(X, Y)] === AIR) { const q = idx(X, Y); set(q, SEED, T[q]); age[q] = m; if (rng() < 0.05) ev("seed_drop", q, T[q]); }
+  }
+}
+// Wild seeds blow in from beyond the map now and then and land on open ground.
+function seedRain() {
+  if (rng() > 0.003) return;
+  const x = rng() * W | 0;
+  for (let y = 1; y < H - 2; y++) { const q = idx(x, y); if (mat[q] === AIR) continue;
+    if (CAPA[mat[q]] > 0 && mat[q - W] === AIR) set(q - W, SEED, T[q - W]); return; }
+}
+// A seed waits until the ground under it suits some species. Wild seeds (from your palette) become whichever species fits.
+function germinate(x, y, i) {
+  if (y + 1 >= H) return;
+  const b = i + W, mb = mat[b], cb = CAPA[mb];
+  if (cb <= 0) { if ((life[i] += 1) > 3600) set(i, AIR, T[i]); return; }   // a seed that can't root rots away after a minute
+  if (rng() > 0.02) return;
+  const f = moist[b] / cb, kind = age[i];
+  let sp = 0;
+  const ok = s => s === GRASS ? f >= 0.06 : s === CACTUS ? mb === SAND && f >= 0.02 && f < 0.5 : mb !== SAND && f >= 0.3;
+  if (kind) sp = ok(kind) ? kind : 0;
+  else if (mb === SAND) sp = f >= 0.15 ? GRASS : f >= 0.02 ? CACTUS : 0;
+  else sp = f >= 0.35 ? PLANT : f >= 0.06 ? GRASS : 0;
+  if (!sp) return;
+  const fert = (mb === SOIL ? 3 : mb === SAND ? 1 : 1.5) * (within(x, y, 2, ASH) ? 2 : 1);
+  if (rng() > 0.2 * fert) return;
+  ev(SPROUT_ID[sp], i, T[i]);
+  const h = SPECIES[sp].height; morph(i, sp); life[i] = h[0] + (rng() * (h[1] - h[0] + 1) | 0); age[i] = 1;
 }
 
 // ---------- Water in the air ----------
@@ -532,28 +655,8 @@ function rainDrop(x, y, i) {
   const mass = Math.min(1, life[i]), extra = life[i] - mass, vap = moist[i];
   mat[i] = WATER; life[i] = 0; moist[i] = 1 - mass;
   if (y > 0 && mat[i - W] === AIR) { life[i - W] += extra; moist[i - W] += vap; }
-  climate.rainCol[x] += mass; climate.water.rained += mass;
+  rainBins[rainBin() + x] += mass; climate.water.rained += mass;
   ev("rain", i, T[i]);
-}
-// Find soil water a plant can reach: look down to the ground below it, then around its roots.
-function rootWater(x, y) {
-  let gy = y + 1;
-  while (gy < H && gy < y + 24 && (mat[idx(x, gy)] === PLANT || mat[idx(x, gy)] === WOOD || mat[idx(x, gy)] === AIR)) gy++;
-  for (let j = gy; j < Math.min(H, gy + 4); j++) for (let k = -2; k <= 2; k++) { const X = x + k; if (X < 0 || X >= W) continue;
-    const m = mat[idx(X, j)]; if (m === MUD || m === WATER) return idx(X, j); }
-  return -1;
-}
-function transpire(x, y, i) {
-  if (rng() > 0.05 || y === 0 || mat[i - W] !== AIR) return;
-  const a = i - W, s = sat(T[a]);
-  if (moist[a] >= s) return;
-  const src = rootWater(x, y);
-  if (src >= 0) {
-    const e = Math.min(0.004 * (s - moist[a]), 0.01);
-    moist[a] += e; moist[src] += e; moist[i] = 0; climate.water.transpired += e;
-    if (rng() < 0.002) ev("transpire", i, T[i]);
-    if (moist[src] >= 1) { if (mat[src] === WATER) { mat[src] = AIR; moist[src] = 0; life[src] = 0; } else morph(src, DIRT); }
-  } else if ((moist[i] += 1) > 600) { ev("wilt", i, T[i]); morph(i, DIRT); }
 }
 // Prevailing wind: each tick every air cell passes a share of its vapour and cloud water downwind,
 // or upward where terrain blocks the way (air forced over a mountain). Ocean air enters upwind.
@@ -617,8 +720,9 @@ function step() {
     }
   }
   windStep();
+  seedRain();
   heatStep();
-  for (let x = 0; x < W; x++) climate.rainCol[x] *= 0.9997;
+  rainBin();
   runRecipes();
   tick++;
 }
@@ -662,11 +766,18 @@ function generate() {
   for (let y = 95; y < H - 2; y++) for (let x = 85; x < 136; x++) { const i = idx(x, y);
     if (mat[i] === STONE || mat[i] === ORE) { const dx = (x - 110) / 16, dy = (y - 124) / 15, d = Math.sqrt(dx * dx + dy * dy);
       T[i] = Math.max(T[i], 900 - (d - 1) * 900); } }
-  // Starting humidity: half-saturated air
-  for (let i = 0; i < N; i++) if (mat[i] === AIR) moist[i] = 0.5 * sat(T[i]);
+  // Starting humidity: half-saturated air; dirt starts a little damp, sand dry
+  for (let i = 0; i < N; i++) { if (mat[i] === AIR) moist[i] = 0.5 * sat(T[i]); else if (mat[i] === DIRT) moist[i] = 0.15; }
+  // Grass on the hills between the pond and the mountain
+  for (let x = 130; x < 172; x++) { const g = ground(x); if (rng() < 0.6 && mat[idx(x, g - 1)] === AIR && mat[idx(x, g)] === DIRT) {
+    const q = idx(x, g - 1); set(q, GRASS, 20); age[q] = 1000; } }
+  // The desert: two old cacti, and dormant seeds buried in the surface sand that wait for water
+  for (const cx of [12, 30]) { const g = ground(cx); for (let k = 1; k <= 3; k++) { const q = idx(cx, g - k); set(q, CACTUS, 20); age[q] = 1000; }
+    moist[idx(cx, g)] = 0.03; }
+  for (let n = 0; n < 30; n++) { const x = 2 + (rng() * 38 | 0), g = ground(x); const q = idx(x, g); if (mat[q] === SAND) set(q, SEED, 20); }
   // Trees, with damp soil around their roots
   for (const tx of [55, 75, 140, 152, 163]) { const g = ground(tx), h = 6 + (rng() * 4 | 0);
-    for (let j = 0; j < 3; j++) for (let k = -2; k <= 2; k++) { const q = idx(tx + k, g + j); if (mat[q] === DIRT) set(q, MUD, T[q]); }
+    for (let j = 0; j < 3; j++) for (let k = -2; k <= 2; k++) { const q = idx(tx + k, g + j); if (mat[q] === DIRT) { set(q, MUD, T[q]); moist[q] = 0.8; } }
     for (let k = 1; k <= h; k++) set(idx(tx, g - k), WOOD, 20);
     for (let j = -3; j <= 2; j++) for (let i = -3; i <= 3; i++) if (i * i + j * j < 10) { const X = tx + i, Y = g - h - 1 + j;
       if (mat[idx(X, Y)] === AIR) { set(idx(X, Y), PLANT, 20); age[idx(X, Y)] = 2000; } } }
@@ -674,7 +785,7 @@ function generate() {
   const cf = 62, cg = ground(cf);
   for (const dx of [-1, 0, 1]) set(idx(cf + dx, cg - 1), WOOD, 20);
   set(idx(cf, cg - 2), EMBER, 600); life[idx(cf, cg - 2)] = 400;
-  for (let x = cf + 2; x < 74; x++) { const g = ground(x); if (mat[idx(x, g - 1)] === AIR) { set(idx(x, g - 1), PLANT, 20); age[idx(x, g - 1)] = 2000; } }
+  for (let x = cf + 2; x < 74; x++) { const g = ground(x); if (mat[idx(x, g - 1)] === AIR) { set(idx(x, g - 1), GRASS, 20); age[idx(x, g - 1)] = 2000; } }
   tick = 0;
 }
 
@@ -698,7 +809,8 @@ function render() {
     if (view === "humidity") {
       if (m === AIR) { const rh = Math.min(1, moist[i] / sat(t)); r = 225 - rh * 185; g = 190 - rh * 90; b = 130 + rh * 85;
         if (life[i] > 0.004) { r = g = b = 255; } }
-      else { const c = P[m].col; r = c[0] * .35 + 40; g = c[1] * .35 + 40; b = c[2] * .35 + 40; if (m === WATER || m === MUD) { r = 30; g = 70; b = 200; } }
+      else if (CAPA[m] > 0) { const f = Math.min(1, moist[i] / CAPA[m]); r = 150 - f * 120; g = 120 - f * 40; b = 80 + f * 130; }
+      else { const c = P[m].col; r = c[0] * .35 + 40; g = c[1] * .35 + 40; b = c[2] * .35 + 40; if (m === WATER) { r = 30; g = 70; b = 200; } }
     } else if (thermal) {
       [r, g, b] = thermalColor(t);
       if (m === AIR) { r *= .55; g *= .55; b *= .55; }
@@ -719,7 +831,7 @@ function render() {
 
 // ---------- Interaction ----------
 const BASE_PALETTE = [STONE, SAND, DIRT, CLAY, WATER, WOOD, SEED, ORE];
-const UNLOCKABLE = [ICE, STEAM, MUD, ASH, CHARCOAL, GLASS, BRICK, METAL];
+const UNLOCKABLE = [ICE, STEAM, MUD, ASH, CHARCOAL, GLASS, BRICK, METAL, SOIL];
 let palette = new Set(BASE_PALETTE), paintMat = SAND, tool = "paint", brush = 2, down = false, lastCell = null;
 const newMats = new Set();
 let discTimer = 0;
@@ -814,6 +926,7 @@ function drawGauge() {
   if (rg.width !== w || rg.height !== h) { rg.width = w; rg.height = h; }
   const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue("--muted").trim(), line = css.getPropertyValue("--line").trim();
   rgx.clearRect(0, 0, w, h);
+  rainTotals();
   let max = 1; for (let x = 0; x < W; x++) max = Math.max(max, climate.rainCol[x]);
   const sx = w / W, top = 16 * dpr, bh = h - top - 2 * dpr;
   rgx.fillStyle = "#4a8ef0";
@@ -829,8 +942,10 @@ function drawTip() {
   const el = document.getElementById("tip");
   if (hoverI < 0) { el.hidden = true; return; }
   const y = hoverI / W | 0, alt = 80 - y;
-  const m = mat[hoverI], air = m === AIR ? ` · humidity ${Math.round(100 * moist[hoverI] / sat(T[hoverI]))}%${life[hoverI] > 0.02 ? " · cloud" : ""}` : "";
-  el.innerHTML = `${life[hoverI] > 0.02 && m === AIR ? "Cloud" : P[m].name} · <b class="t">${Math.round(T[hoverI])}°</b> <span class="alt">${air} · ${alt >= 0 ? `altitude ${alt}` : `depth ${-alt}`}</span>`;
+  const m = mat[hoverI], cp = CAPA[m];
+  const soilTxt = cp > 0 ? ` · water ${Math.round(100 * moist[hoverI] / cp)}%` : SPECIES[m] ? (moist[hoverI] > SPECIES[m].thirst * 0.3 ? " · thirsty" : " · watered") : "";
+  const air = m === AIR ? ` · humidity ${Math.round(100 * moist[hoverI] / sat(T[hoverI]))}%${life[hoverI] > 0.02 ? " · cloud" : ""}` : "";
+  el.innerHTML = `${life[hoverI] > 0.02 && m === AIR ? "Cloud" : SPECIES[m] ? SPECIES[m].name : m === SEED && age[hoverI] ? `${SPECIES[age[hoverI]].name} seed` : P[m].name}${soilTxt} · <b class="t">${Math.round(T[hoverI])}°</b> <span class="alt">${air} · ${alt >= 0 ? `altitude ${alt}` : `depth ${-alt}`}</span>`;
   el.hidden = false;
   const flip = tipX > cv.clientWidth - 200;
   el.style.left = `${tipX}px`; el.style.top = `${tipY}px`;
@@ -865,7 +980,7 @@ function saveLastAsRecipe() {
 }
 document.getElementById("savelast").onclick = saveLastAsRecipe;
 let recording = null, recipes = [], pendingRun = null, runs = [];
-const CRAFTED = [CHARCOAL, GLASS, BRICK, METAL, MUD, ASH, ICE];
+const CRAFTED = [CHARCOAL, GLASS, BRICK, METAL, MUD, ASH, ICE, SOIL];
 function recordStroke(x, y, t, m, r) {
   if (!recording.origin) { recording.origin = [x, y]; recording.t0 = tick; }
   recording.strokes.push([tick - recording.t0, t[0], m, x - recording.origin[0], y - recording.origin[1], r]);
@@ -965,14 +1080,29 @@ function drawJournal() {
     }
     goals.appendChild(row);
   }
+  const lh = document.createElement("div"); lh.className = "small"; lh.style.marginTop = "6px"; lh.textContent = "Living things"; goals.appendChild(lh);
+  for (const m of LIVING) {
+    const done = RX[RXI[SPROUT_ID[m]]].first !== null, key = "L" + m, lv = hintLevel[key] || 0, row = document.createElement("div");
+    row.className = "goalrow" + (done ? " done" : "");
+    row.innerHTML = done ? `<i style="background:rgb(${P[m].col})"></i>✓ ${SPECIES[m].name} grown from seed` : `<span class="unknown"></span>Undiscovered plant`;
+    if (!done) {
+      const b = document.createElement("button"); b.className = "small"; b.textContent = lv === 0 ? "Hint" : lv < 3 ? "Another hint" : "No more hints";
+      b.disabled = lv >= 3; b.onclick = () => { hintLevel[key] = lv + 1; metrics.hints = (metrics.hints || 0) + 1; drawJournal(); };
+      row.appendChild(b);
+      if (lv > 0) { const h = document.createElement("div"); h.className = "hint"; h.textContent = LIVING_HINTS[m].slice(0, lv).join(" "); row.appendChild(h); }
+    }
+    goals.appendChild(row);
+  }
   journalDirty = false;
 }
 function drawClimate() {
+  rainTotals();
   const zone = (a, b) => { let s = 0; for (let x = a; x < b; x++) s += climate.rainCol[x]; return s; }, f = v => v.toFixed(1);
-  document.getElementById("rainzones").textContent = `Recent rain — desert ${f(zone(0, 42))} · valley ${f(zone(42, 170))} · mountain ${f(zone(170, 214))} · coast ${f(zone(214, W))}`;
+  document.getElementById("rainzones").textContent = `Rain in the last 60 s — desert ${f(zone(0, 42))} · valley ${f(zone(42, 170))} · mountain ${f(zone(170, 214))} · coast ${f(zone(214, W))}`;
   const w = climate.water;
   document.getElementById("waterbudget").textContent = `Water moved (cells) — from ocean ${f(w.inflow)} · evaporated ${f(w.evaporated)} · from plants ${f(w.transpired)} · rained ${f(w.rained)} · blown away ${f(w.outflow)}`;
 }
+document.getElementById("gaugereset").onclick = () => { rainBins.fill(0); climate.rainCol.fill(0); };
 document.getElementById("winddir").onchange = e => climate.windDir = +e.target.value;
 document.getElementById("windstr").oninput = e => climate.wind = +e.target.value;
 document.getElementById("oceanrh").oninput = e => { climate.oceanRH = e.target.value / 100; document.getElementById("oceanrhv").textContent = `${e.target.value}%`; };
@@ -1026,7 +1156,7 @@ function newWorld() {
   for (const r of RX) Object.assign(r, { seen: 0, caused: 0, tmin: Infinity, tmax: -Infinity, first: null });
   Object.assign(metrics, { firstSeen: null, firstCaused: null, firstLaw: null, firstRecipe: null, recipeRuns: 0, causedEvents: 0, strokes: 0 });
   for (const k in energy) energy[k] = 0;
-  for (const k in climate.water) climate.water[k] = 0; climate.rainCol.fill(0);
+  for (const k in climate.water) climate.water[k] = 0; rainBins.fill(0); climate.rainCol.fill(0);
   touched.fill(-1e9); palette = new Set(BASE_PALETTE); runs = []; newMats.clear(); pings.length = 0;
   strokeLog.length = 0; lastProduct = null; for (const k in hintLevel) delete hintLevel[k]; document.getElementById("disc").hidden = true;
   for (const r of recipes) r.verified = false;
@@ -1058,7 +1188,7 @@ function loop(now) {
   if (++uiTick % 15 === 0) { if (journalDirty) drawJournal(); drawMetrics(); drawClimate(); }
   requestAnimationFrame(loop);
 }
-window.WORLD = { step, mat, T, P, RX, moist, life, climate, sat, C: () => C, energy, metrics, applyBrush, idx, generate, M: { AIR, STONE, SAND, WATER, WOOD, CHARCOAL, ORE, METAL, GLASS, CLAY, BRICK, PLANT, STEAM, ICE, LAVA }, setSeed: s => { seed = s; } };
+window.WORLD = { step, mat, T, P, RX, moist, life, age, climate, sat, rainTotals, CAPA, C: () => C, energy, metrics, applyBrush, idx, generate, M: { AIR, STONE, SAND, DIRT, MUD, SOIL, SEED, GRASS, CACTUS, ASH, WATER, WOOD, CHARCOAL, ORE, METAL, GLASS, CLAY, BRICK, PLANT, STEAM, ICE, LAVA }, setSeed: s => { seed = s; } };
 drawSnaps(); drawLegend(); newWorld();
 requestAnimationFrame(loop);
 </script>

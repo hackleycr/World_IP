@@ -1,6 +1,6 @@
 # Prototype 0 — "Is discovery fun?"
 
-Status: v0.3 (climate) built 2026-10-20 after playtests [01 and 02](../playtests/2026-10-20-playtest-01.md) — [prototype/index.html](../../prototype/index.html). Throwaway: it exists to answer one question, and its code is not the production base (D12).
+Status: v0.4 (plants and soil) built 2026-10-20 after playtests [01 and 02](../playtests/2026-10-20-playtest-01.md) — [prototype/index.html](../../prototype/index.html). Throwaway: it exists to answer one question, and its code is not the production base (D12).
 
 ## The question
 
@@ -45,6 +45,14 @@ Status: v0.3 (climate) built 2026-10-20 after playtests [01 and 02](../playtests
 | v0 | First build | Test the core question |
 | v0.2 | Labels showing reactions on the map, a cursor readout, recipes saved by working backwards from a result, discovery cards, hints | Playtest 01 feedback |
 | v0.3 | **Climate:** humidity, evaporation, clouds and rain; wind from an ocean beyond the east edge, deflected upward by terrain; plants that move soil water into the air and wilt without it; humidity view; rain gauge; climate panel (wind, ocean humidity, rain by region, water budget, questions to investigate). Also: fires quenched by water dump their heat into it, and charcoal relights only with real air | Playtest 01 requests (deserts, mountains, forests); the player chose climate first |
+
+| v0.3.1 | Wet fuel can't ignite (fixes a quench/relight loop); a labelled rain-gauge strip; a wind indicator | Playtest 03 |
+| v0.4 | **Plants and soil:** water soaks into and drains through ground (sand, dirt, soil, mud); three species (grass, cactus, tree) with different water needs, chosen by where a seed lands; plants spread seeds downwind, drink from their roots, wilt, drown, and rot into **soil**; roots and ash turn sand or dirt into soil (succession); dormant seeds in the desert; wild seeds blowing in; the water view shows ground moisture; a "Living things" goal list with hints. Rain gauge is a rolling 60 s window with a Reset button | Playtest 04: "plants are fun, let's do more"; the gauge kept stale data |
+
+**Verified headlessly for v0.4:**
+- With light, steady watering of the desert, cacti establish first, their roots turn sand into soil (2 → 56 cells in 5 minutes), and grass follows (3 → 20).
+- Flooding drowns plants, and they rot into soil.
+- A step takes 1.7–2.0 ms, with no errors.
 
 **Verified headlessly for v0.3:**
 - Water is conserved over 5 minutes: water cells stay at 350–390.
