@@ -11,8 +11,9 @@ THEMES = {
     "grind_repetition": (
         "P1", r"\bgrind\w*|\brepetitive|\brepetition|\btedious|\bchores?\b|\bbusywork|\bpadd(ed|ing)\b"),
     "progress_loss_devaluation": (
-        "P1", r"\b(lost|lose|losing|loses|wiped?|reset\w*)\b.{0,25}\b(progress|saves?|items?|gear|"
-              r"everything|hours|character|world)\b|\bnerf\w*|\bpower creep|\bsunset\w*|\bwipes?\b"),
+        "P1", r"\b(lost|lose|losing|loses|wiped?|wiping|reset(s|ting)?)\s+(all\s+)?(of\s+)?"
+              r"(my|your|our|the|that|this|their)?\s*(\w+\s+)?(progress|saves?|save files?|items|gear|"
+              r"characters?|worlds?|colony|everything)\b|\bnerf\w*|\bpower creep|\bsunset\w*|\bvault(ed|ing)\b"),
     "rng_luck": (
         "P1", r"\brng\b|\bluck\b|\bunlucky|\bgacha|\bloot ?box|\bdrop rates?\b"),
     "monetization": (
@@ -31,17 +32,20 @@ THEMES = {
         "P3", r"\bdiscover\w*|\bcurio(us|sity)|\bmyster(y|ies|ious)|\bexplor\w*|\bsecrets?\b|\baha\b|"
               r"\beureka|\bfigur(e|ed|ing) (it |things |stuff )?out|\bsense of wonder"),
     "learning_curve_opacity": (
-        "P3", r"learning curve|\bconfus\w*|\bno tutorial|\bbad tutorial|\bwiki\b|\boverwhelm\w*|\bobtuse|"
-              r"\bopaque|\bcryptic|\bunclear|hard to (understand|learn|get into)|\bunintuitive|\bnot explained"),
+        "P3", r"learning curve|\bconfus\w*|\bno tutorial|\bbad tutorial|\bwiki\b|\boverwhelm(?!ingly\s+positive)\w*|\bobtuse|"
+              r"\bopaque|\bcryptic|\bunclear|hard to (understand|learn|get into)|\bunintuitive|\bnot explained|"
+              r"\bdoesn'?t explain|\bsteep\b"),
     "depth_systems": (
         "P3", r"\bdepth\b|\bin-?depth|\bcomplex\w*|\bmechanics\b|\bsystems\b|\bstrateg\w*|\boptimi[sz](e|ing)\b|"
               r"\bmin-?max\w*|\bsynerg\w*"),
     "creativity_building": (
-        "P3", r"\bbuild(ing|s)?\b|\bcreat(e|ive|ivity|ions?)\b|\bsandbox|\bfreedom\b|\bautomat\w*|\bfactor(y|ies)|"
-              r"\bdesign(ing)? (your|my) own"),
+        "P3", r"\bbuild(ing|s)?\s+(a\s+|an\s+|my\s+|your\s+|the\s+|huge\s+|massive\s+)?(bases?|factor(y|ies)|"
+              r"houses?|machines?|contraptions?|structures?|stuff|things|anything|whatever|wands?|decks?|"
+              r"colon(y|ies)|cities|city|castles?|megabases?)\b|\bcreativ\w*|\bsandbox|\bfreedom\b|\bautomat(e|es|ed|ing|ion)\b|"
+              r"\bdesign(ing)? (your|my) own|\bbase[- ]?building|\bfactory[- ]?building|\bbuilding (is|was|system)"),
     "emergence_simulation": (
-        "P3", r"\bphysics\b|\bsimulat\w*|\bemergen\w*|\binteract(ion|ions|s)?\b|chain reaction|\bchemistry|"
-              r"\bsystemic"),
+        "P3", r"\bphysics\b|\bsimulation\b|\bsimulated\b|\bemergen(t|ce)\b|interact(s)? with (each|one) other|"
+              r"\bchain reactions?|\bsystemic|\bsandbox physics|\bfluid (dynamics|simulation)|\bgas(es)?\b|\btemperature|\bheat\b"),
     # Engagement and retention
     "addictive_time_sink": (
         "ENG", r"\baddict\w*|one more (run|turn|day|game)|time sink|can'?t stop|lost track of time|"
@@ -49,9 +53,10 @@ THEMES = {
     "replayability_variety": (
         "ENG", r"\breplay\w*|every run|each run|\bprocedural\w*|randomly generated|\bvariety\b|"
                r"different every"),
-    "content_runs_out": (
-        "ENG", r"\bnot enough content|\bnothing to do|\bran out of|\bend ?game\b|\bdead game|\bno updates|"
-               r"\babandon\w*|\btoo short|\bshort game"),
+    "content_exhaustion": (
+        "ENG", r"\b(not enough|lack of|no) (end ?game )?content|nothing (left |else )?to do(?! with)|"
+               r"ran out of (content|things)|\bdead game|\bno (more |new )?updates|content drought|"
+               r"\bgets? (old|stale|boring) (fast|quickly|after)|\btoo short\b|\bshort game"),
     # Context themes
     "difficulty": (
         "CTX", r"\bdifficult\w*|\bchalleng\w*|\bpunishing|\bbrutal\b|\bunfair\w*|\btoo (hard|easy)"),

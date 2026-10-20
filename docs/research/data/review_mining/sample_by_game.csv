@@ -1,0 +1,75 @@
+group,game,vote,n,median_words,median_playtime_at_review_h
+commercial_control,Among Us,negative,499,15.0,20.2
+commercial_control,Among Us,positive,501,4.0,14.6
+commercial_control,Balatro,negative,500,15.0,18.5
+commercial_control,Balatro,positive,500,5.0,29.4
+commercial_control,Baldur's Gate 3,negative,500,36.5,32.75
+commercial_control,Baldur's Gate 3,positive,500,7.0,128.65
+commercial_control,Counter-Strike 2,negative,500,8.0,218.55
+commercial_control,Counter-Strike 2,positive,500,3.0,96.35
+commercial_control,Destiny 2,negative,500,16.0,36.65
+commercial_control,Destiny 2,positive,500,7.0,89.25
+commercial_control,Diablo® IV,negative,500,49.0,14.6
+commercial_control,Diablo® IV,positive,500,7.0,34.1
+commercial_control,Dota 2,negative,500,5.0,1212.7
+commercial_control,Dota 2,positive,500,3.0,722.75
+commercial_control,ELDEN RING,negative,500,21.0,119.5
+commercial_control,ELDEN RING,positive,500,6.0,96.1
+commercial_control,HELLDIVERS™ 2,negative,500,34.5,344.0
+commercial_control,HELLDIVERS™ 2,positive,500,5.0,54.15
+commercial_control,Hades,negative,500,31.5,10.4
+commercial_control,Hades,positive,500,8.0,18.15
+commercial_control,Palworld,negative,500,34.0,51.099999999999994
+commercial_control,Palworld,positive,500,8.0,68.2
+commercial_control,Slay the Spire,negative,500,26.5,15.25
+commercial_control,Slay the Spire,positive,500,7.0,22.9
+commercial_control,Stardew Valley,negative,500,12.0,11.649999999999999
+commercial_control,Stardew Valley,positive,500,6.0,61.95
+commercial_control,The Elder Scrolls V: Skyrim Special Edition,negative,500,22.0,133.2
+commercial_control,The Elder Scrolls V: Skyrim Special Edition,positive,500,6.0,35.95
+commercial_control,Vampire Survivors,negative,500,24.0,8.95
+commercial_control,Vampire Survivors,positive,500,7.0,23.950000000000003
+knowledge_discovery,ANIMAL WELL,negative,500,62.0,5.1
+knowledge_discovery,ANIMAL WELL,positive,500,17.0,13.9
+knowledge_discovery,Baba Is You,negative,363,43.0,5.4
+knowledge_discovery,Baba Is You,positive,500,9.0,10.3
+knowledge_discovery,Cultist Simulator,negative,500,66.5,7.75
+knowledge_discovery,Cultist Simulator,positive,500,26.0,43.6
+knowledge_discovery,FEZ,negative,500,36.5,2.7
+knowledge_discovery,FEZ,positive,500,19.0,10.1
+knowledge_discovery,Heaven's Vault,negative,343,114.0,6.0
+knowledge_discovery,Heaven's Vault,positive,500,56.0,21.6
+knowledge_discovery,Infinifactory,negative,100,29.5,1.45
+knowledge_discovery,Infinifactory,positive,500,16.0,19.75
+knowledge_discovery,Magicka,negative,500,20.0,6.3
+knowledge_discovery,Magicka,positive,500,11.0,15.3
+knowledge_discovery,Opus Magnum,negative,136,50.0,4.949999999999999
+knowledge_discovery,Opus Magnum,positive,500,11.0,16.5
+knowledge_discovery,Outer Wilds,negative,499,50.0,6.0
+knowledge_discovery,Outer Wilds,positive,501,13.0,25.4
+knowledge_discovery,Potion Craft: Alchemist Simulator,negative,500,54.0,7.65
+knowledge_discovery,Potion Craft: Alchemist Simulator,positive,500,15.0,18.05
+knowledge_discovery,Return of the Obra Dinn,negative,500,84.0,4.95
+knowledge_discovery,Return of the Obra Dinn,positive,500,21.0,11.1
+knowledge_discovery,TUNIC,negative,500,77.5,7.65
+knowledge_discovery,TUNIC,positive,500,28.0,17.6
+knowledge_discovery,The Witness,negative,500,53.5,8.75
+knowledge_discovery,The Witness,positive,500,19.0,21.9
+systemic_sandbox,Dwarf Fortress,negative,500,72.5,15.350000000000001
+systemic_sandbox,Dwarf Fortress,positive,500,16.0,72.0
+systemic_sandbox,Factorio,negative,500,18.5,51.8
+systemic_sandbox,Factorio,positive,500,8.0,145.0
+systemic_sandbox,Noita,negative,500,33.0,13.35
+systemic_sandbox,Noita,positive,500,12.0,59.3
+systemic_sandbox,Oxygen Not Included,negative,499,42.0,20.3
+systemic_sandbox,Oxygen Not Included,positive,501,12.0,125.4
+systemic_sandbox,RimWorld,negative,499,32.0,87.2
+systemic_sandbox,RimWorld,positive,501,10.0,312.4
+systemic_sandbox,Satisfactory,negative,500,29.0,40.900000000000006
+systemic_sandbox,Satisfactory,positive,500,8.0,92.3
+systemic_sandbox,Teardown,negative,500,15.5,9.3
+systemic_sandbox,Teardown,positive,500,5.0,20.0
+systemic_sandbox,Terraria,negative,500,7.0,39.8
+systemic_sandbox,Terraria,positive,500,5.0,48.55
+systemic_sandbox,Valheim,negative,500,45.0,161.45
+systemic_sandbox,Valheim,positive,500,8.0,163.3

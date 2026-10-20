@@ -1,0 +1,9 @@
+theme,pillar,precision_round,precision_correct,precision_n,precision_pct,recall_human_positive,recall_codebook_caught,recall_pct,recall_false_positives_in_60,note
+grind_repetition,P1,1,11,12,92,10,8,80,1,Misses misspellings (repetative) and paraphrase (filler; 5x as long)
+progress_loss_devaluation,P1,2,10,12,83,2,0,0,0,Round 1 was 7/12 before tightening; misses word orders like 'every progress lost' / 'progress is gone'
+discovery_curiosity,P3,1,11,12,92,16,10,63,0,Misses paraphrase (puzzles feel in my brain; that moment when you realize; clues)
+learning_curve_opacity,P3,1,10,12,83,8,3,38,1,Two round-1 errors were Steam's 'Overwhelmingly Positive' label (now excluded); misses 'needed guides/hints' phrasing
+creativity_building,P3,2,9,12,75,5,3,60,0,Round 1 was 7/12; 'automatically' false positive since excluded
+emergence_simulation,P3,2,8,12,67,1,1,,0,Round 1 was 3/12; 'emergencies' and 'fluid movement' false positives since excluded (not re-measured); too few positives in random sample to estimate recall
+permanence_consequence,P2,1,9,12,75,5,0,0,1,Recall failure: irreversible outcomes described in plain words (reset if you die; can no longer complete; impossible to remove)
+content_exhaustion,ENG,2,7,12,58,4,0,0,0,Round 1 (as content_runs_out) was 2/12; 4 of 5 round-2 errors were 'nothing to do with' (since excluded); misses 'novelty wears off' / 'one and done'

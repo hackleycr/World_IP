@@ -1,0 +1,7 @@
+group,vote,count,mean,std,min,25%,50%,75%,max
+commercial_control,negative,7499.0,330.0,1092.5,0.1,7.8,38.2,194.5,22017.6
+commercial_control,positive,7501.0,265.3,895.6,0.1,13.9,47.0,154.2,18557.0
+knowledge_discovery,negative,5441.0,11.3,22.8,0.0,1.8,5.8,13.7,1015.0
+knowledge_discovery,positive,6501.0,30.0,75.3,0.1,8.6,16.8,31.5,3849.2
+systemic_sandbox,negative,4498.0,196.9,642.8,0.1,5.6,33.4,155.1,22891.7
+systemic_sandbox,positive,4502.0,301.6,670.5,0.1,24.5,94.3,299.9,13113.9

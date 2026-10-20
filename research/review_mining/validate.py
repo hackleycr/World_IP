@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from codebook import code  # noqa: E402
 
 KEY = ["grind_repetition", "progress_loss_devaluation", "discovery_curiosity", "learning_curve_opacity",
-       "creativity_building", "emergence_simulation", "permanence_consequence", "content_runs_out"]
+       "creativity_building", "emergence_simulation", "permanence_consequence", "content_exhaustion"]
 
 src, out = sys.argv[1], sys.argv[2]
 n = int(sys.argv[3]) if len(sys.argv) > 3 else 12
