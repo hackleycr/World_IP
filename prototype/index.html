@@ -92,7 +92,7 @@ label { font-size: 13px; }
 </head>
 <body>
 <header>
-  <h1>World IP Prototype 0.4</h1>
+  <h1>World IP Prototype 0.5</h1>
   <p>Experiment with the world. Every reaction you notice goes in the journal; every one you cause becomes a law.</p>
 </header>
 <main>
@@ -126,7 +126,7 @@ label { font-size: 13px; }
       <ul class="list" id="journal"></ul>
     </section>
     <section class="card">
-      <h2>Materials this world can make</h2>
+      <h2>Discoveries</h2>
       <div id="goals"></div>
     </section>
     <section class="card">
@@ -161,6 +161,7 @@ label { font-size: 13px; }
           <li>Does a forest make the air downwind wetter? Plant seeds by water and watch the humidity view.</li>
           <li>What happens to plants when the wind stops bringing ocean air?</li>
           <li>Water the desert. What grows first, and what comes after?</li>
+          <li>Where do different rocks form? Look around the lava chamber, under the dune, and at the bottom of the pond.</li>
           <li>Which plants grow on sand, on dirt, and on mud? Why?</li>
           <li>What happens to a forest if the rain stops? To a cactus if you flood it?</li>
         </ul>
@@ -198,7 +199,8 @@ label { font-size: 13px; }
 const W = 240, H = 135, N = W * H;
 const AIR=0, STONE=1, SAND=2, DIRT=3, MUD=4, CLAY=5, WATER=6, ICE=7, STEAM=8, WOOD=9, PLANT=10, SEED=11,
       EMBER=12, COAL_EMBER=13, ASH=14, LAVA=15, ORE=16, METAL=17, GLASS=18, BRICK=19, CHARCOAL=20,
-      SMOKE=21, MGLASS=22, BEDROCK=23, GRASS=24, CACTUS=25, SOIL=26;
+      SMOKE=21, MGLASS=22, BEDROCK=23, GRASS=24, CACTUS=25, SOIL=26,
+      SANDSTONE=27, SHALE=28, BASALT=29, GRANITE=30, OBSIDIAN=31, QUARTZITE=32, SLATE=33;
 const GAS=0, POWDER=1, LIQUID=2, SOLID=3;
 const P = [];
 function def(id, name, phase, dens, k, cap, col) { P[id] = { name, phase, dens, k, cap, col }; }
@@ -230,8 +232,22 @@ def(BEDROCK,  "Bedrock",      SOLID,  99,   .002, 1,   [40, 36, 40]);
 def(GRASS,    "Grass",        SOLID,  9,    .08,  1.2, [128, 178, 66]);
 def(CACTUS,   "Cactus",       SOLID,  9,    .1,   1.5, [64, 128, 96]);
 def(SOIL,     "Soil",         POWDER, 1.3,  .12,  1.1, [66, 46, 30]);
+def(SANDSTONE,"Sandstone",    SOLID,  9,    .2,   .9,  [200, 160, 108]);
+def(SHALE,    "Shale",        SOLID,  9,    .18,  1,   [92, 90, 100]);
+def(BASALT,   "Basalt",       SOLID,  9,    .25,  1,   [54, 54, 62]);
+def(GRANITE,  "Granite",      SOLID,  9,    .25,  1,   [176, 150, 150]);
+def(OBSIDIAN, "Obsidian",     SOLID,  9,    .12,  .8,  [28, 20, 40]);
+def(QUARTZITE,"Quartzite",    SOLID,  9,    .3,   .9,  [226, 218, 208]);
+def(SLATE,    "Slate",        SOLID,  9,    .2,   1,   [66, 78, 94]);
+const ROCKS = [SANDSTONE, SHALE, BASALT, GRANITE, OBSIDIAN, QUARTZITE, SLATE];
+// Weight each cell adds to everything below it; "load" is the total weight above a cell (pressure).
+const WEIGHT = new Float32Array(64), load = new Float32Array(N), LOAD_ROCK = 12;
+for (let m = 0; m < P.length; m++) { const q = P[m]; if (!q) continue;
+  WEIGHT[m] = q.phase === GAS ? 0 : q.phase === SOLID ? 2.5 : q.dens; }
+WEIGHT[WOOD] = .6; WEIGHT[PLANT] = WEIGHT[GRASS] = WEIGHT[CACTUS] = .3; WEIGHT[ICE] = .9; WEIGHT[BEDROCK] = 0;
+function computeLoad() { for (let x = 0; x < W; x++) { let acc = 0; for (let y = 0; y < H; y++) { const i = y * W + x; load[i] = acc; acc += WEIGHT[mat[i]]; } } }
 // Ground that holds water: how much (in water-cell units) a cell can hold, and how fast it drains downward.
-const CAPA = new Float32Array(32), DRAIN = new Float32Array(32);
+const CAPA = new Float32Array(64), DRAIN = new Float32Array(64);
 CAPA[SAND] = .25; DRAIN[SAND] = .2; CAPA[DIRT] = .5; DRAIN[DIRT] = .06; CAPA[SOIL] = .7; DRAIN[SOIL] = .05; CAPA[MUD] = 1; DRAIN[MUD] = .03;
 // Plant species. need: wettest root-zone fraction they can drink from; thirst: water checks they survive without it.
 const SPECIES = {
@@ -285,7 +301,13 @@ const RX = [
   ["pyrolysis", "Wood heated without air turns to charcoal", CHARCOAL],
   ["ignite_coal", "Charcoal catches fire — and burns hotter", null],
   ["sand_melt", "Sand melts", MGLASS], ["glass_set", "Molten sand sets into glass", GLASS],
-  ["clay_fire", "Clay fires into brick", BRICK], ["lava_cool", "Lava cools into stone", STONE],
+  ["clay_fire", "Clay fires into brick", BRICK],
+  ["lava_basalt", "Lava cooling fast in open air sets into basalt", BASALT],
+  ["lava_granite", "Lava cooling slowly underground sets into granite", GRANITE],
+  ["lava_obsidian", "Lava quenched by water sets into glassy obsidian", OBSIDIAN],
+  ["compact_sand", "Buried sand is pressed into sandstone", SANDSTONE], ["compact_mud", "Buried mud or clay is pressed into shale", SHALE],
+  ["meta_quartzite", "Heat and pressure turn sandstone into quartzite", QUARTZITE], ["meta_slate", "Heat and pressure turn shale into slate", SLATE],
+  ["weather", "Water and ice slowly wear rock back to sand or clay", null],
   ["stone_melt", "Stone melts into lava", LAVA], ["smelt", "Ore touching charcoal, heated, gives metal", METAL],
   ["wet_dirt", "Water soaks dirt into mud", MUD], ["dry_mud", "Mud dries back into dirt", DIRT],
   ["sprout_grass", "Grass sprouts from a seed", null], ["sprout_cactus", "A cactus sprouts from a seed", null],
@@ -301,7 +323,8 @@ const RXI = Object.fromEntries(RX.map((r, i) => [r.id, i]));
 const SHORT = { boil: "Water → steam", condense: "Steam → water", freeze: "Water → ice", melt: "Ice → water",
   ignite_wood: "Wood ignites", ignite_plant: "Plant ignites", burnout: "Fire → ash", smother: "No air: fire → charcoal",
   quench: "Water: fire → charcoal", pyrolysis: "Hot wood, no air → charcoal", ignite_coal: "Charcoal ignites (hotter!)",
-  sand_melt: "Sand melts", glass_set: "→ Glass", clay_fire: "Clay → brick", lava_cool: "Lava → stone", stone_melt: "Stone melts",
+  sand_melt: "Sand melts", glass_set: "→ Glass", clay_fire: "Clay → brick", lava_basalt: "Lava → basalt", lava_granite: "Lava → granite", lava_obsidian: "Lava → obsidian",
+  compact_sand: "Sand → sandstone", compact_mud: "Mud → shale", meta_quartzite: "→ Quartzite", meta_slate: "→ Slate", weather: "Rock wears away", stone_melt: "Stone melts",
   smelt: "Ore → metal", wet_dirt: "Dirt + water → mud", dry_mud: "Mud dries", sprout_grass: "Grass sprouts", sprout_cactus: "Cactus sprouts", sprout_tree: "Tree sprouts", lignify: "Plant → wood",
   seed_burn: "Seed burns", evaporate: "Water evaporates", cloud: "Cloud forms", rain: "Rain",
   transpire: "Plant breathes out vapour", wilt: "Plant dies → soil", soak: "Ground soaks up water",
@@ -324,6 +347,15 @@ const HINTS = {
 HINTS[SOIL] = ["Plants change the ground they grow in.", "Dead plants rot into something richer than dirt, and grass roots work on sand.",
   "Let grass grow on watered sand for a while, or let some plants die of thirst."];
 const LIVING = [GRASS, CACTUS, PLANT];
+const ROCK_HINTS = {
+  [SANDSTONE]: ["Sand doesn't stay sand forever.", "Bury it deep: the weight above presses it together.", "Pile about 8 cells of material on top of sand, then wait."],
+  [SHALE]: ["Mud and clay can turn to stone too.", "Like sand, they need weight on top.", "Bury mud or clay under a deep pile, then wait."],
+  [BASALT]: ["Lava doesn't always cool into the same rock.", "Where lava cools matters. In open air it cools fast.", "Dig down to the lava so it meets open air."],
+  [GRANITE]: ["Some lava cools slowly, deep underground.", "Look closely at the rock around the lava chamber.", "Lava sealed inside rock, with no air or water touching it, cools into granite."],
+  [OBSIDIAN]: ["The fastest cooling makes a glassy rock.", "What cools lava fastest?", "Let water reach the lava: dig a channel from the pond down to it."],
+  [QUARTZITE]: ["Buried rock changes again when it's heated.", "Sandstone near great heat transforms.", "Heat sandstone above about 500° while a few cells of material sit on it."],
+  [SLATE]: ["Shale changes when heated under load too.", "It needs less heat than sandstone does.", "Heat shale above about 300° while a few cells of material sit on it."],
+};
 const LIVING_HINTS = {
   [GRASS]: ["Seeds need damp ground.", "Grass is the least fussy plant: almost any damp ground will do.", "Drop seeds on damp dirt, or on sand that has had some water."],
   [CACTUS]: ["Some plants like it dry.", "Try seeds on sand with only a little water.", "Drop seeds on desert sand and add a few drops of water: not too much."],
@@ -332,7 +364,7 @@ const LIVING_HINTS = {
 const hintLevel = {};
 // Reactions whose trigger is not a temperature: the journal does not show a measured temperature for these.
 const NON_THERMAL = new Set(["wet_dirt", "dry_mud", "sprout_grass", "sprout_cactus", "sprout_tree", "lignify", "quench", "smother",
-  "rain", "transpire", "wilt", "soak", "seed_drop", "soil_form", "rot"]);
+  "rain", "transpire", "wilt", "soak", "seed_drop", "soil_form", "rot", "compact_sand", "compact_mud", "weather"]);
 let journalDirty = true;
 
 // Player activity map: 8x8 blocks, last tick the player acted there. Used to tell player-caused events.
@@ -354,7 +386,7 @@ function ev(id, i, temp) {
   if ((fresh || mine) && tick - (lastPing[id] ?? -1e9) > 75 && pings.length < 10) {
     lastPing[id] = tick; pings.push({ x: i % W, y: i / W | 0, text: SHORT[id], t0: tick, mine });
   }
-  if (mine && CRAFTED.includes(r.prod)) lastProduct = { m: r.prod, x: i % W, y: i / W | 0, tick };
+  if (mine && WORTH.includes(r.prod)) lastProduct = { m: r.prod, x: i % W, y: i / W | 0, tick };
   if (fresh) { r.first = secs(); journalDirty = true; if (metrics.firstSeen === null) metrics.firstSeen = secs();
     if (r.prod !== null) unlock(r.prod, r, mine); }
   if (mine) {
@@ -481,6 +513,7 @@ function react(x, y, i, m) {
       if (t < C.boil) { life[i] += (C.boil - t) * .5; T[i] = C.boil; if (life[i] >= LV) { ev("condense", i, C.boil); mat[i] = WATER; T[i] = C.boil; life[i] = 0; } }
       break;
     case MUD: case DIRT: case SOIL:
+      if (m !== DIRT && load[i] >= LOAD_ROCK && rng() < 0.0001) { squeeze(x, y, i); ev("compact_mud", i, t); morph(i, SHALE); break; }
       soilStep(x, y, i, m);
       if (m === DIRT && rng() < 0.0003 && y > 0 && (mat[i - W] === GRASS || mat[i - W] === PLANT) && within(x, y, 2, ASH)) {
         ev("soil_form", i, t); const w = moist[i]; morph(i, SOIL); moist[i] = w; }
@@ -490,10 +523,12 @@ function react(x, y, i, m) {
         const b = i + W, w = moist[b]; ev("soil_form", b, T[b]); morph(b, SOIL); moist[b] = w; set(i, AIR, T[i]); }
       break;
     case CLAY:
-      if (t >= C.clayFire) { ev("clay_fire", i, t); morph(i, BRICK); }
+      if (t >= C.clayFire) { ev("clay_fire", i, t); morph(i, BRICK); break; }
+      if (load[i] >= LOAD_ROCK && rng() < 0.0001) { ev("compact_mud", i, t); morph(i, SHALE); }
       break;
     case SAND:
       if (t >= C.sandMelt) { ev("sand_melt", i, t); morph(i, MGLASS); break; }
+      if (load[i] >= LOAD_ROCK && rng() < 0.0001) { squeeze(x, y, i); ev("compact_sand", i, t); morph(i, SANDSTONE); break; }
       soilStep(x, y, i, m);
       // Roots of grass or cacti, given water, slowly turn sand into soil.
       if (moist[i] > 0.03 && y > 0 && (mat[i - W] === GRASS || mat[i - W] === CACTUS) && rng() < 0.0006) {
@@ -505,11 +540,19 @@ function react(x, y, i, m) {
     case GLASS:
       if (t >= C.sandMelt + 20) morph(i, MGLASS);
       break;
-    case LAVA:
-      if (t < C.lavaSolid) { ev("lava_cool", i, t); morph(i, STONE); }
-      break;
-    case STONE:
-      if (t >= C.stoneMelt) { ev("stone_melt", i, t); morph(i, LAVA); }
+    case LAVA: {
+      // Exposed lava loses heat fast: radiating into open air, and flash-boiling any water it touches.
+      const wj = hasNeighbor(x, y, n => n === WATER);
+      if (wj >= 0) { const e = 0.05 * (T[i] - 100) * P[LAVA].cap; T[i] -= e / P[LAVA].cap; T[wj] += e / P[WATER].cap; }
+      else if (y > 0 && isAirish(mat[i - W])) { const e = 0.006 * (T[i] - amb(y)) * P[LAVA].cap; T[i] -= e / P[LAVA].cap; energy.sky -= e; }
+      if (T[i] < C.lavaSolid) {   // which rock depends on how fast it cooled: water > open air > sealed underground
+        if (hasNeighbor(x, y, n => n === WATER || n === ICE || n === STEAM) >= 0) { ev("lava_obsidian", i, t); morph(i, OBSIDIAN); }
+        else if (hasNeighbor(x, y, isAirish) >= 0) { ev("lava_basalt", i, t); morph(i, BASALT); }
+        else { ev("lava_granite", i, t); morph(i, GRANITE); }
+      }
+      break; }
+    case STONE: case SANDSTONE: case SHALE: case BASALT: case GRANITE: case OBSIDIAN: case QUARTZITE: case SLATE:
+      rockStep(x, y, i, m, t);
       break;
     case WOOD:
       if (t >= C.woodIgnite && hasNeighbor(x, y, n => n === WATER) < 0) {
@@ -550,6 +593,24 @@ function burn(x, y, i, m) {
   if (y > 0 && mat[i - W] === AIR && rng() < 0.04) { mat[i - W] = SMOKE; life[i - W] = 60 + rng() * 60; }
   if ((life[i] -= 1) <= 0) { ev("burnout", i, T[i]); morph(i, ASH); }
 }
+// ---------- Rocks ----------
+// Water in buried sediment is squeezed out upward when it turns to rock.
+function squeeze(x, y, i) {
+  if (moist[i] <= 0) return;
+  for (let j = y - 1; j >= Math.max(0, y - 12); j--) { const q = idx(x, j), c = CAPA[mat[q]];
+    if (c > 0 && moist[q] < c) { const t = Math.min(moist[i], c - moist[q]); moist[q] += t; moist[i] -= t; if (moist[i] <= 0) return; } }
+}
+function rockStep(x, y, i, m, t) {
+  if (t >= (m === OBSIDIAN ? C.sandMelt : C.stoneMelt)) { ev("stone_melt", i, t); morph(i, LAVA); return; }
+  if (m === SANDSTONE && t >= 500 && load[i] >= LOAD_ROCK / 3 && rng() < 0.01) { ev("meta_quartzite", i, t); morph(i, QUARTZITE); return; }
+  if (m === SHALE && t >= 300 && load[i] >= LOAD_ROCK / 3 && rng() < 0.01) { ev("meta_slate", i, t); morph(i, SLATE); return; }
+  // Weathering: rock touched by water (much faster with ice: freeze-thaw) slowly crumbles.
+  if (rng() < 0.0004) {
+    const ice = hasNeighbor(x, y, n => n === ICE) >= 0, wet = ice || hasNeighbor(x, y, n => n === WATER) >= 0;
+    if (wet && rng() < (ice ? 0.5 : 0.1)) { ev("weather", i, t); morph(i, m === SHALE || m === SLATE ? CLAY : SAND); }
+  }
+}
+
 // ---------- Soil water and plants ----------
 function soilStep(x, y, i, m) {
   const cap = CAPA[m];
@@ -704,6 +765,7 @@ function heatStep() {
 
 function step() {
   frameId = (frameId % 250) + 1;
+  if (tick % 30 === 0) computeLoad();
   for (let y = H - 1; y >= 0; y--) {
     const ltr = (tick + y) & 1;
     for (let k = 0; k < W; k++) {
@@ -786,7 +848,7 @@ function generate() {
   for (const dx of [-1, 0, 1]) set(idx(cf + dx, cg - 1), WOOD, 20);
   set(idx(cf, cg - 2), EMBER, 600); life[idx(cf, cg - 2)] = 400;
   for (let x = cf + 2; x < 74; x++) { const g = ground(x); if (mat[idx(x, g - 1)] === AIR) { set(idx(x, g - 1), GRASS, 20); age[idx(x, g - 1)] = 2000; } }
-  tick = 0;
+  tick = 0; computeLoad();
 }
 
 // ---------- Rendering ----------
@@ -836,21 +898,21 @@ let palette = new Set(BASE_PALETTE), paintMat = SAND, tool = "paint", brush = 2,
 const newMats = new Set();
 let discTimer = 0;
 function unlock(m, rx, mine) {
-  if (!UNLOCKABLE.includes(m) || palette.has(m)) return;
+  if ((!UNLOCKABLE.includes(m) && !ROCKS.includes(m)) || palette.has(m)) return;
   palette.add(m); newMats.add(m); drawPalette(); journalDirty = true;
   const how = RX.filter(r => r.prod === m && r.first !== null).map(r => NON_THERMAL.has(r.id) ? r.name : `${r.name} (at about ${Math.round(r.tmin)}°)`).join("; ");
   const el = document.getElementById("disc");
   el.innerHTML = `<div class="kicker">${mine ? "You made a new material" : "New material spotted"}</div>
     <h3><i style="background:rgb(${P[m].col})"></i>${P[m].name}</h3>
     <p>${esc(how)}. It is now in your palette.</p>
-    <div class="row">${mine ? `<button id="discsave" class="on">Save how I made it as a recipe</button>` : ""}<button id="discok">OK</button></div>`;
+    <div class="row">${mine && WORTH.includes(m) ? `<button id="discsave" class="on">Save how I made it as a recipe</button>` : ""}<button id="discok">OK</button></div>`;
   el.hidden = false; discTimer = 600;
   document.getElementById("discok").onclick = () => { el.hidden = true; };
   const sv = document.getElementById("discsave"); if (sv) sv.onclick = () => { saveLastAsRecipe(); el.hidden = true; };
 }
 function drawPalette() {
   const el = document.getElementById("palette"); el.innerHTML = "";
-  for (const m of [...BASE_PALETTE, ...UNLOCKABLE]) {
+  for (const m of [...BASE_PALETTE, ...UNLOCKABLE, ...ROCKS]) {
     if (!palette.has(m)) continue;
     const b = document.createElement("button"); b.className = "swatch" + (m === paintMat && tool === "paint" ? " on" : "");
     b.innerHTML = `<i style="background:rgb(${P[m].col})"></i>${P[m].name}${newMats.has(m) ? ' <span class="newb">NEW</span>' : ""}`;
@@ -944,8 +1006,9 @@ function drawTip() {
   const y = hoverI / W | 0, alt = 80 - y;
   const m = mat[hoverI], cp = CAPA[m];
   const soilTxt = cp > 0 ? ` · water ${Math.round(100 * moist[hoverI] / cp)}%` : SPECIES[m] ? (moist[hoverI] > SPECIES[m].thirst * 0.3 ? " · thirsty" : " · watered") : "";
+  const rockTxt = P[m].phase === SOLID || P[m].phase === POWDER ? ` · load ${Math.round(load[hoverI])}` : "";
   const air = m === AIR ? ` · humidity ${Math.round(100 * moist[hoverI] / sat(T[hoverI]))}%${life[hoverI] > 0.02 ? " · cloud" : ""}` : "";
-  el.innerHTML = `${life[hoverI] > 0.02 && m === AIR ? "Cloud" : SPECIES[m] ? SPECIES[m].name : m === SEED && age[hoverI] ? `${SPECIES[age[hoverI]].name} seed` : P[m].name}${soilTxt} · <b class="t">${Math.round(T[hoverI])}°</b> <span class="alt">${air} · ${alt >= 0 ? `altitude ${alt}` : `depth ${-alt}`}</span>`;
+  el.innerHTML = `${life[hoverI] > 0.02 && m === AIR ? "Cloud" : SPECIES[m] ? SPECIES[m].name : m === SEED && age[hoverI] ? `${SPECIES[age[hoverI]].name} seed` : P[m].name}${soilTxt}${rockTxt} · <b class="t">${Math.round(T[hoverI])}°</b> <span class="alt">${air} · ${alt >= 0 ? `altitude ${alt}` : `depth ${-alt}`}</span>`;
   el.hidden = false;
   const flip = tipX > cv.clientWidth - 200;
   el.style.left = `${tipX}px`; el.style.top = `${tipY}px`;
@@ -955,41 +1018,68 @@ function drawTip() {
 // ---------- Recipes ----------
 // Every player stroke from the last two minutes, so a success can be turned into a recipe after the fact.
 const strokeLog = [];
-function recipeFromHistory(x, y, endTick) {
-  while (strokeLog.length && strokeLog[0][0] < tick - 7200) strokeLog.shift();
-  const near = strokeLog.filter(s => s[0] <= endTick && s[0] >= endTick - 5400 && Math.hypot(s[3] - x, s[4] - y) <= 22);
-  const kept = [];
-  for (const s of near) {   // painting or digging the same cell twice in a row does nothing, so drop repeats
-    const p = kept[kept.length - 1];
-    if (p && s[1] !== "t" && p[1] === s[1] && p[2] === s[2] && p[3] === s[3] && p[4] === s[4] && p[5] === s[5]) continue;
-    kept.push(s);
+// Merge runs of the same stroke into one step with a duration (holding the torch in place for 200 ticks
+// becomes one step), and drop repeated paint/dig strokes, which do nothing the second time.
+// Strokes are [tick, tool, material, x, y, radius, duration].
+function compressStrokes(list) {
+  const out = [];
+  for (const s of list) {
+    const p = out[out.length - 1];
+    const same = p && p[1] === s[1] && p[2] === s[2] && p[3] === s[3] && p[4] === s[4] && p[5] === s[5];
+    if (same && s[1] !== "t") continue;
+    if (same && s[0] - (p[0] + p[6]) <= 2) { p[6] = s[0] - p[0] + 1; continue; }
+    out.push([s[0], s[1], s[2], s[3], s[4], s[5], 1]);
   }
+  return out;
+}
+// Work backwards from a result: find the cells of the material just made, and keep only the strokes from the
+// preceding 90 s that landed on or near them (within 5 cells), so the recipe is what actually made it.
+function recipeFromHistory(x, y, endTick, m) {
+  while (strokeLog.length && strokeLog[0][0] < tick - 7200) strokeLog.shift();
+  let start = -1;
+  for (let r = 0; r <= 5 && start < 0; r++) for (let j = -r; j <= r && start < 0; j++) for (let k = -r; k <= r; k++) {
+    const X = x + k, Y = y + j; if (X >= 0 && Y >= 0 && X < W && Y < H && mat[idx(X, Y)] === m) { start = idx(X, Y); break; } }
+  const near = new Uint8Array(N);
+  const mark = q => { const qx = q % W, qy = q / W | 0;
+    for (let j = -5; j <= 5; j++) for (let k = -5; k <= 5; k++) { const X = qx + k, Y = qy + j; if (X >= 0 && Y >= 0 && X < W && Y < H) near[idx(X, Y)] = 1; } };
+  if (start >= 0) {   // the connected patch of the product (up to 400 cells)
+    const seen = new Set([start]), stack = [start];
+    while (stack.length && seen.size < 400) { const q = stack.pop(); mark(q);
+      for (const [dx, dy] of N8) { const X = q % W + dx, Y = (q / W | 0) + dy; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+        const n = idx(X, Y); if (!seen.has(n) && mat[n] === m) { seen.add(n); stack.push(n); } } }
+  } else mark(idx(x, y));
+  const touchesProduct = s => { for (let j = -s[5]; j <= s[5]; j++) for (let k = -s[5]; k <= s[5]; k++) {
+    const X = s[3] + k, Y = s[4] + j; if (X >= 0 && Y >= 0 && X < W && Y < H && near[idx(X, Y)]) return true; } return false; };
+  const kept = compressStrokes(strokeLog.filter(s => s[0] <= endTick && s[0] >= endTick - 5400 && touchesProduct(s)));
   if (!kept.length) return null;
   const [t0, , , ox, oy] = kept[0];
-  return kept.map(([t, tl, m, sx, sy, r]) => [t - t0, tl, m, sx - ox, sy - oy, r]);
+  return kept.map(([t, tl, mm, sx, sy, r, d]) => [t - t0, tl, mm, sx - ox, sy - oy, r, d]);
 }
 function saveLastAsRecipe() {
   if (!lastProduct) return;
-  const strokes = recipeFromHistory(lastProduct.x, lastProduct.y, lastProduct.tick);
+  const strokes = recipeFromHistory(lastProduct.x, lastProduct.y, lastProduct.tick, lastProduct.m);
   if (!strokes) { setRecState("I couldn't find your actions near that spot."); return; }
   const name = `Make ${P[lastProduct.m].name.toLowerCase()}`;
   recipes.push({ name, strokes, history: [{ total: 1, made: { [lastProduct.m]: 1 } }], verified: true });
   metrics.recipesSaved++; metrics.autoRecipes = (metrics.autoRecipes || 0) + 1; if (metrics.firstRecipe === null) metrics.firstRecipe = secs();
-  setRecState(`Saved “${name}” from your last ${Math.round(strokes[strokes.length - 1][0] / 60)} s of work nearby (${strokes.length} steps). Press Run, then click where to repeat it.`);
+  const last = strokes[strokes.length - 1];
+  setRecState(`Saved “${name}”: ${strokes.length} steps over ${Math.round((last[0] + last[6]) / 60)} s, kept from the work that touched what you made. Press Run, then click where to repeat it.`);
   drawRecipes();
 }
 document.getElementById("savelast").onclick = saveLastAsRecipe;
 let recording = null, recipes = [], pendingRun = null, runs = [];
-const CRAFTED = [CHARCOAL, GLASS, BRICK, METAL, MUD, ASH, ICE, SOIL];
+const CRAFTED = [CHARCOAL, GLASS, BRICK, METAL, MUD, ASH, ICE, SOIL, SANDSTONE, SHALE, BASALT, GRANITE, OBSIDIAN, QUARTZITE, SLATE];
+// Results worth a recipe: things that take more than one easy step to make.
+const WORTH = [CHARCOAL, GLASS, BRICK, METAL, ICE, SOIL, SANDSTONE, SHALE, BASALT, GRANITE, OBSIDIAN, QUARTZITE, SLATE];
 function recordStroke(x, y, t, m, r) {
   if (!recording.origin) { recording.origin = [x, y]; recording.t0 = tick; }
-  recording.strokes.push([tick - recording.t0, t[0], m, x - recording.origin[0], y - recording.origin[1], r]);
+  recording.strokes.push([tick - recording.t0, t[0], m, x - recording.origin[0], y - recording.origin[1], r, 1]);
 }
 document.getElementById("rec").onclick = e => {
   if (!recording) { recording = { strokes: [], origin: null }; e.target.textContent = "Stop & save"; e.target.classList.add("on");
     setRecState("Recording… your first click sets the recipe's anchor point."); return; }
   const name = document.getElementById("recname").value.trim() || `Recipe ${recipes.length + 1}`;
-  if (recording.strokes.length) { recipes.push({ name, strokes: recording.strokes, history: [], verified: false });
+  if (recording.strokes.length) { recipes.push({ name, strokes: compressStrokes(recording.strokes), history: [], verified: false });
     metrics.recipesSaved++; if (metrics.firstRecipe === null) metrics.firstRecipe = secs(); setRecState(`Saved “${name}”. Press Run, then click where to run it.`); }
   else setRecState("Nothing recorded.");
   recording = null; e.target.textContent = "Record"; e.target.classList.remove("on"); document.getElementById("recname").value = ""; drawRecipes();
@@ -1008,8 +1098,14 @@ function startRun(rcp, x, y) {
 function runRecipes() {
   for (const r of runs) {
     const s = r.rcp.strokes;
-    while (r.k < s.length && s[r.k][0] / 3 <= tick - r.t0) { const [, t, m, dx, dy, rad] = s[r.k]; applyBrush(r.x + dx, r.y + dy, TOOLS[t], m, rad, false); r.k++; }
-    if (r.k >= s.length && r.end === null) r.end = tick;
+    r.active = r.active || [];
+    while (r.k < s.length && s[r.k][0] / 3 <= tick - r.t0) { r.active.push({ st: s[r.k], left: s[r.k][6] || 1 }); r.k++; }
+    for (const a of r.active) {   // 3x speed: a step held for d ticks is applied d times over d/3 ticks
+      const [, t, m, dx, dy, rad] = a.st;
+      for (let n = 0; n < 3 && a.left > 0; n++, a.left--) applyBrush(r.x + dx, r.y + dy, TOOLS[t], m, rad, false);
+    }
+    r.active = r.active.filter(a => a.left > 0);
+    if (r.k >= s.length && !r.active.length && r.end === null) r.end = tick;
     if (r.end !== null && tick - r.end >= 600) {
       const after = countCrafted(...r.box), made = {};
       let total = 0;
@@ -1025,7 +1121,8 @@ function drawRecipes() {
   const ul = document.getElementById("recipes"); ul.innerHTML = "";
   recipes.forEach((r, n) => {
     const li = document.createElement("li"), h = r.history.map(x => x.total), best = h.length ? Math.max(...h) : null;
-    li.innerHTML = `<div class="row"><b>${esc(r.name)}</b><span class="small">${r.strokes.length} steps · ${r.verified ? "verified here" : "unverified here"}${best !== null ? ` · last ${h[h.length - 1]}, best ${best} (${h.length} runs)` : ""}</span></div>`;
+    const ls = r.strokes[r.strokes.length - 1], dur = Math.round(((ls[0] || 0) + (ls[6] || 1)) / 60);
+    li.innerHTML = `<div class="row"><b>${esc(r.name)}</b><span class="small">${r.strokes.length} steps, ${dur} s · ${r.verified ? "verified here" : "unverified here"}${best !== null ? ` · last ${h[h.length - 1]}, best ${best} (${h.length} runs)` : ""}</span></div>`;
     const row = document.createElement("div"); row.className = "row";
     const run = document.createElement("button"); run.textContent = "Run"; run.onclick = () => { pendingRun = r; setRecState(`Click the world where “${r.name}” should run.`); };
     const exp = document.createElement("button"); exp.textContent = "Copy code"; exp.onclick = () => { const code = btoa(JSON.stringify({ n: r.name, s: r.strokes }));
@@ -1067,7 +1164,7 @@ function drawJournal() {
   }
   const laws = seen.filter(r => r.caused > 0).length;
   document.getElementById("jsum").textContent = `${laws} laws · ${seen.length - laws} observations · ${RX.length - seen.length} reactions not yet seen`;
-  const goals = document.getElementById("goals"); goals.innerHTML = "";
+  const goals = document.getElementById("goals"); goals.innerHTML = '<div class="small">Materials</div>';
   for (const m of UNLOCKABLE) {
     const done = palette.has(m), lv = hintLevel[m] || 0, row = document.createElement("div");
     row.className = "goalrow" + (done ? " done" : "");
@@ -1077,6 +1174,19 @@ function drawJournal() {
       b.disabled = lv >= 3; b.onclick = () => { hintLevel[m] = lv + 1; metrics.hints = (metrics.hints || 0) + 1; drawJournal(); };
       row.appendChild(b);
       if (lv > 0) { const h = document.createElement("div"); h.className = "hint"; h.textContent = HINTS[m].slice(0, lv).join(" "); row.appendChild(h); }
+    }
+    goals.appendChild(row);
+  }
+  const rh = document.createElement("div"); rh.className = "small"; rh.style.marginTop = "6px"; rh.textContent = "Rocks"; goals.appendChild(rh);
+  for (const m of ROCKS) {
+    const done = palette.has(m), key = "R" + m, lv = hintLevel[key] || 0, row = document.createElement("div");
+    row.className = "goalrow" + (done ? " done" : "");
+    row.innerHTML = done ? `<i style="background:rgb(${P[m].col})"></i>✓ ${P[m].name}` : `<span class="unknown"></span>Undiscovered rock`;
+    if (!done) {
+      const b = document.createElement("button"); b.className = "small"; b.textContent = lv === 0 ? "Hint" : lv < 3 ? "Another hint" : "No more hints";
+      b.disabled = lv >= 3; b.onclick = () => { hintLevel[key] = lv + 1; metrics.hints = (metrics.hints || 0) + 1; drawJournal(); };
+      row.appendChild(b);
+      if (lv > 0) { const h = document.createElement("div"); h.className = "hint"; h.textContent = ROCK_HINTS[m].slice(0, lv).join(" "); row.appendChild(h); }
     }
     goals.appendChild(row);
   }
@@ -1188,7 +1298,7 @@ function loop(now) {
   if (++uiTick % 15 === 0) { if (journalDirty) drawJournal(); drawMetrics(); drawClimate(); }
   requestAnimationFrame(loop);
 }
-window.WORLD = { step, mat, T, P, RX, moist, life, age, climate, sat, rainTotals, CAPA, C: () => C, energy, metrics, applyBrush, idx, generate, M: { AIR, STONE, SAND, DIRT, MUD, SOIL, SEED, GRASS, CACTUS, ASH, WATER, WOOD, CHARCOAL, ORE, METAL, GLASS, CLAY, BRICK, PLANT, STEAM, ICE, LAVA }, setSeed: s => { seed = s; } };
+window.WORLD = { load, ROCKS, recipes: () => recipes, saveLastAsRecipe, lastProduct: () => lastProduct, startRun: (r, x, y) => startRun(r, x, y), step, mat, T, P, RX, moist, life, age, climate, sat, rainTotals, CAPA, C: () => C, energy, metrics, applyBrush, idx, generate, M: { AIR, STONE, SAND, DIRT, MUD, SOIL, SEED, GRASS, CACTUS, ASH, WATER, WOOD, CHARCOAL, ORE, METAL, GLASS, CLAY, BRICK, PLANT, STEAM, ICE, LAVA }, setSeed: s => { seed = s; } };
 drawSnaps(); drawLegend(); newWorld();
 requestAnimationFrame(loop);
 </script>

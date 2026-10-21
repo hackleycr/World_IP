@@ -33,6 +33,11 @@ This is the smallest set I think still produces interesting combinations. Every 
 | P11 | **Soil water** (each kind of ground holds a different amount and drains at a different speed) | Infiltration, drainage, drying, mud | Rain soaks into dirt and runs straight through sand; soaked dirt turns to mud |
 | P12 | **Life with traits** (species differ in water need, thirst tolerance, height and seeding) | Which plants grow where, succession | Wild seeds become cacti on dryish sand, grass on damp ground, trees on wet dirt; dead plants and roots make soil |
 
+| P13 | **Pressure** (the weight of everything above a cell) | Burial, compaction, metamorphism | Sand under about 8 cells of material presses into sandstone; mud and clay into shale |
+| P14 | **Cooling environment** (open air, water or sealed rock decides how fast lava cools) | Which igneous rock forms | Water-quenched lava → obsidian; open air → basalt; sealed underground → granite |
+
+The rock cycle closes: weathering by water and ice → sediment → burial → sedimentary rock → heat under load (sandstone → quartzite above about 500°, shale → slate above about 300°) → melting → lava → igneous rock. P13 and P14 were added in v0.5 (geology).
+
 P9 and P10 were added in prototype v0.3 (2026-10-20), after playtest 01 asked how mountains, forests and deserts shape the climate. Water is conserved through the whole cycle: ocean inflow, evaporation, plants releasing vapour, cloud, rain, soaking into soil, and drying out. Raindrops can be partial cells, and they merge when they touch. P11 and P12 were added in v0.4 (plants and soil), after playtest 04: "plants are fun, let's do more".
 
 **Conservation (from section 4 of the pillars doc):** heat energy is conserved inside the simulation. It enters only through P8 and leaves only through slow radiation into the sky. Every reaction in P6 declares its energy change explicitly. This is the main balance lever (D3).

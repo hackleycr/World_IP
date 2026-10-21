@@ -1,6 +1,6 @@
 # Prototype 0 — "Is discovery fun?"
 
-Status: v0.4 (plants and soil) built 2026-10-20 after playtests [01 and 02](../playtests/2026-10-20-playtest-01.md) — [prototype/index.html](../../prototype/index.html). Throwaway: it exists to answer one question, and its code is not the production base (D12).
+Status: v0.5 (recipes fixed, geology) built 2026-10-21 after playtests [01 and 02](../playtests/2026-10-20-playtest-01.md) — [prototype/index.html](../../prototype/index.html). Throwaway: it exists to answer one question, and its code is not the production base (D12).
 
 ## The question
 
@@ -48,6 +48,18 @@ Status: v0.4 (plants and soil) built 2026-10-20 after playtests [01 and 02](../p
 
 | v0.3.1 | Wet fuel can't ignite (fixes a quench/relight loop); a labelled rain-gauge strip; a wind indicator | Playtest 03 |
 | v0.4 | **Plants and soil:** water soaks into and drains through ground (sand, dirt, soil, mud); three species (grass, cactus, tree) with different water needs, chosen by where a seed lands; plants spread seeds downwind, drink from their roots, wilt, drown, and rot into **soil**; roots and ash turn sand or dirt into soil (succession); dormant seeds in the desert; wild seeds blowing in; the water view shows ground moisture; a "Living things" goal list with hints. Rain gauge is a rolling 60 s window with a Reset button | Playtest 04: "plants are fun, let's do more"; the gauge kept stale data |
+
+| v0.5 | **Recipes:** working backwards now keeps only strokes that landed on or within 5 cells of the cells actually made; runs of the same stroke merge into one step with a duration (held torch = 1 step); only results that take real work offer a save (charcoal, glass, brick, metal, ice, soil, rocks). **Geology:** a pressure field (the weight above each cell); seven rocks (sandstone, shale, basalt, granite, obsidian, quartzite, slate) formed by burial, cooling environment, and heat under load; weathering by water and freeze–thaw; exposed lava radiates and flash-boils water; tooltip shows load; Discoveries panel groups materials, rocks and living things | Playtest 05: the "Make ash" recipe had 253 steps and was never run; the player asked for recipes first, then geology |
+
+**Verified headlessly for v0.5:**
+- A charcoal kiln built amid unrelated strokes gives a 26-step recipe (25 paint strokes plus 1 torch step) instead of hundreds, and replaying it elsewhere makes charcoal.
+- Sandstone forms at the base of the dune and granite around the lava chamber, with no player action.
+- In controlled set-ups:
+  - lava in open air → basalt (23–28 cells)
+  - lava with water poured on → obsidian (36–44 cells)
+  - charcoal fire against buried sandstone → quartzite (8 cells; the sandstone reached 832°)
+  - lava against buried shale → slate (3 cells)
+- Regression checks pass: charcoal, ice, metal, the rain shadow and desert succession. A step takes 2.1–2.3 ms, with no errors.
 
 **Verified headlessly for v0.4:**
 - With light, steady watering of the desert, cacti establish first, their roots turn sand into soil (2 → 56 cells in 5 minutes), and grass follows (3 → 20).
