@@ -78,6 +78,10 @@ label { font-size: 13px; }
 @media (prefers-reduced-motion: no-preference) { .newb { animation: pulse 1.2s ease-in-out infinite; } }
 @keyframes pulse { 50% { opacity: .45; } }
 .gauge { margin-top: 6px; }
+.spark { margin-top: 6px; }
+.sparkhead { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sparkhead b { color: var(--ink); }
+.spark canvas { width: 100%; height: 40px; display: block; border: 0; border-radius: 0; background: transparent; cursor: crosshair; image-rendering: auto; }
 #raingauge { width: 100%; height: 56px; display: block; image-rendering: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: default; }
 #legend { margin-top: 6px; font-size: 11px; color: var(--muted); }
 #legend .bar { height: 10px; border-radius: 3px; border: 1px solid var(--line); }
@@ -92,7 +96,7 @@ label { font-size: 13px; }
 </head>
 <body>
 <header>
-  <h1>World IP Prototype 0.5</h1>
+  <h1>World IP Prototype 0.6</h1>
   <p>Experiment with the world. Every reaction you notice goes in the journal; every one you cause becomes a law.</p>
 </header>
 <main>
@@ -144,6 +148,14 @@ label { font-size: 13px; }
       </details>
     </section>
     <section class="card">
+      <h2>Ecosystem</h2>
+      <div class="small">Populations over the last 5 minutes. Each chart has its own scale. Hover a chart to read a value.</div>
+      <div class="spark"><div class="sparkhead"><span>Grazers</span><b id="pop-grazer">0</b></div><canvas id="spark-grazer" height="40" aria-label="Grazer population chart"></canvas></div>
+      <div class="spark"><div class="sparkhead"><span>Predators</span><b id="pop-predator">0</b></div><canvas id="spark-predator" height="40" aria-label="Predator population chart"></canvas></div>
+      <div class="spark"><div class="sparkhead"><span>Grass (cells)</span><b id="pop-grass">0</b></div><canvas id="spark-grass" height="40" aria-label="Grass chart"></canvas></div>
+      <div class="small" id="deathlog" style="margin-top:6px"></div>
+    </section>
+    <section class="card">
       <h2>Climate</h2>
       <div class="row">
         <select id="winddir" aria-label="Wind direction">
@@ -161,6 +173,7 @@ label { font-size: 13px; }
           <li>Does a forest make the air downwind wetter? Plant seeds by water and watch the humidity view.</li>
           <li>What happens to plants when the wind stops bringing ocean air?</li>
           <li>Water the desert. What grows first, and what comes after?</li>
+          <li>What happens to the grass if you add many grazers? To the grazers if you add predators? Can all three last?</li>
           <li>Where do different rocks form? Look around the lava chamber, under the dune, and at the bottom of the pond.</li>
           <li>Which plants grow on sand, on dirt, and on mud? Why?</li>
           <li>What happens to a forest if the rain stops? To a cactus if you flood it?</li>
@@ -251,7 +264,7 @@ const CAPA = new Float32Array(64), DRAIN = new Float32Array(64);
 CAPA[SAND] = .25; DRAIN[SAND] = .2; CAPA[DIRT] = .5; DRAIN[DIRT] = .06; CAPA[SOIL] = .7; DRAIN[SOIL] = .05; CAPA[MUD] = 1; DRAIN[MUD] = .03;
 // Plant species. need: wettest root-zone fraction they can drink from; thirst: water checks they survive without it.
 const SPECIES = {
-  [GRASS]:  { name: "Grass",  need: .06, drink: .01,  height: [1, 3],  grow: .01,  seedRate: .0004, spread: 7, burn: 40,  thirst: 120 },
+  [GRASS]:  { name: "Grass",  need: .06, drink: .01,  height: [1, 3],  grow: .01,  seedRate: .001, spread: 7, burn: 40,  thirst: 120 },
   [CACTUS]: { name: "Cactus", need: .01, drink: .002, height: [2, 5],  grow: .003, seedRate: .0002, spread: 5, burn: 120, thirst: 3000, drowns: true },
   [PLANT]:  { name: "Tree",   need: .2,  drink: .03,  height: [6, 11], grow: .004, seedRate: .00004, spread: 5, burn: 90, thirst: 200 },
 };
@@ -318,6 +331,12 @@ const RX = [
   ["wilt", "Plants without water die and rot into soil", SOIL], ["soak", "Ground soaks up water", null],
   ["seed_drop", "Plants drop seeds that land downwind", null], ["soil_form", "Plants and ash turn sand or dirt into soil", SOIL],
   ["rot", "Plants rot under water, and cacti in waterlogged ground", SOIL],
+  ["graze", "Grazers eat grass and low leaves", null], ["drink", "Animals drink water", null],
+  ["birth_grazer", "Well-fed grazers breed", null], ["birth_predator", "Well-fed predators breed", null],
+  ["hunt", "Predators hunt grazers", null], ["dung", "Grazer dung carries seeds and feeds the ground", null],
+  ["starve", "Animals die without food or water", SOIL], ["old_age", "Animals die of old age", SOIL],
+  ["drown", "Animals drown in deep water", SOIL], ["burn_animal", "Fire and heat kill animals", ASH],
+  ["buried", "Animals buried alive suffocate", SOIL],
 ].map(([id, name, prod]) => ({ id, name, prod, seen: 0, caused: 0, tmin: Infinity, tmax: -Infinity, first: null }));
 const RXI = Object.fromEntries(RX.map((r, i) => [r.id, i]));
 const SHORT = { boil: "Water → steam", condense: "Steam → water", freeze: "Water → ice", melt: "Ice → water",
@@ -328,7 +347,9 @@ const SHORT = { boil: "Water → steam", condense: "Steam → water", freeze: "W
   smelt: "Ore → metal", wet_dirt: "Dirt + water → mud", dry_mud: "Mud dries", sprout_grass: "Grass sprouts", sprout_cactus: "Cactus sprouts", sprout_tree: "Tree sprouts", lignify: "Plant → wood",
   seed_burn: "Seed burns", evaporate: "Water evaporates", cloud: "Cloud forms", rain: "Rain",
   transpire: "Plant breathes out vapour", wilt: "Plant dies → soil", soak: "Ground soaks up water",
-  seed_drop: "Seed dropped", soil_form: "→ Soil", rot: "Plant rots" };
+  seed_drop: "Seed dropped", soil_form: "→ Soil", rot: "Plant rots", graze: "Grazing", drink: "Drinking",
+  birth_grazer: "Grazer born", birth_predator: "Predator born", hunt: "Hunted!", dung: "Dung + seed", starve: "Starved",
+  old_age: "Died of old age", drown: "Drowned", burn_animal: "Burned", buried: "Buried" };
 // Three hints per material, from a nudge to the answer. The player chooses when to ask.
 const HINTS = {
   [ICE]: ["Ice already exists somewhere in this world. Where is it?", "Hover around: the air gets colder the higher you go.",
@@ -347,6 +368,15 @@ const HINTS = {
 HINTS[SOIL] = ["Plants change the ground they grow in.", "Dead plants rot into something richer than dirt, and grass roots work on sand.",
   "Let grass grow on watered sand for a while, or let some plants die of thirst."];
 const LIVING = [GRASS, CACTUS, PLANT];
+const ANIMAL_GOALS = [
+  ["birth_grazer", "Grazers breeding", ["Animals breed when life is good.", "Grazers need plenty of grass and water, and another grazer nearby.",
+    "Keep grazers near grass and the pond, away from predators, and wait."]],
+  ["birth_predator", "Predators breeding", ["Predators breed when they've eaten well.", "They need grazers to hunt, and another predator nearby.",
+    "Put two predators where there are plenty of grazers."]],
+  ["hunt", "A predator hunting", ["Predators get hungry.", "Watch a predator when grazers are nearby.", "Place a predator next to a group of grazers."]],
+  ["dung", "Animals spreading seeds", ["Grazers do more than eat plants.", "Watch the ground behind a grazer that has been eating.",
+    "A grazer that has eaten grass drops a grass seed in its dung after a while."]],
+];
 const ROCK_HINTS = {
   [SANDSTONE]: ["Sand doesn't stay sand forever.", "Bury it deep: the weight above presses it together.", "Pile about 8 cells of material on top of sand, then wait."],
   [SHALE]: ["Mud and clay can turn to stone too.", "Like sand, they need weight on top.", "Bury mud or clay under a deep pile, then wait."],
@@ -364,7 +394,8 @@ const LIVING_HINTS = {
 const hintLevel = {};
 // Reactions whose trigger is not a temperature: the journal does not show a measured temperature for these.
 const NON_THERMAL = new Set(["wet_dirt", "dry_mud", "sprout_grass", "sprout_cactus", "sprout_tree", "lignify", "quench", "smother",
-  "rain", "transpire", "wilt", "soak", "seed_drop", "soil_form", "rot", "compact_sand", "compact_mud", "weather"]);
+  "rain", "transpire", "wilt", "soak", "seed_drop", "soil_form", "rot", "compact_sand", "compact_mud", "weather",
+  "graze", "drink", "birth_grazer", "birth_predator", "hunt", "dung", "starve", "old_age", "drown", "burn_animal", "buried"]);
 let journalDirty = true;
 
 // Player activity map: 8x8 blocks, last tick the player acted there. Used to tell player-caused events.
@@ -593,6 +624,160 @@ function burn(x, y, i, m) {
   if (y > 0 && mat[i - W] === AIR && rng() < 0.04) { mat[i - W] = SMOKE; life[i - W] = 60 + rng() * 60; }
   if ((life[i] -= 1) <= 0) { ev("burnout", i, T[i]); morph(i, ASH); }
 }
+// ---------- Animals ----------
+// Animals are agents that live in air cells on the grid. Each has food, water and age; they eat plants, drink water,
+// breed, flee or hunt, and when they die their bodies become soil.
+const GRAZER = 1, PREDATOR = 2;
+const KIND = {
+  [GRAZER]:   { name: "Grazer",   col: [244, 236, 214], head: [122, 78, 40], drain: .007, thirst: .008, walk: 5, run: 2, life: [16000, 24000],
+                mature: 1800, cool: 1500, mateRange: 18, birthCost: 30, breedFood: 70, crowdR: 10, crowdMax: 6 },
+  [PREDATOR]: { name: "Predator", col: [40, 40, 48], head: [255, 140, 40],  drain: .005, thirst: .007, walk: 4, run: 1, life: [20000, 28000],
+                mature: 3600, cool: 6000, mateRange: 40, birthCost: 40, breedFood: 80, crowdR: 30, crowdMax: 2 },
+};
+const MAX_ANIMALS = 220;
+let animals = [];
+// Animals walk past vegetation and tree trunks (they are in the background of a side view); they stand on trunks and ground.
+const passable = m => P[m].phase === GAS || m === GRASS || m === PLANT || m === CACTUS || m === SEED || m === WOOD;
+const fallThrough = m => P[m].phase === GAS || m === GRASS || m === PLANT || m === SEED;
+function spawnAnimal(kind, x, y, food = 70) {
+  if (animals.length >= MAX_ANIMALS || x < 0 || x >= W || y < 1 || y >= H || !passable(mat[idx(x, y)])) return null;
+  const k = KIND[kind], a = { kind, x, y, dir: rng() < .5 ? -1 : 1, food, water: 80, age: 0, cool: 600, drownT: 0,
+    maxAge: k.life[0] + rng() * (k.life[1] - k.life[0]), dung: 0, ate: GRASS, seekT: 0, alive: true, phase: rng() * 60 | 0, chase: 0, rest: 0 };
+  animals.push(a); return a;
+}
+const deaths = { hunger: 0, thirst: 0, old_age: 0, hunted: 0, drown: 0, burn: 0, buried: 0 };
+function killAnimal(a, cause, why) {
+  if (!a.alive) return;
+  a.alive = false; const i = idx(a.x, a.y);
+  ev(cause, i, T[i]);
+  deaths[why || { old_age: "old_age", drown: "drown", burn_animal: "burn", buried: "buried" }[cause]]++;
+  const shared = animals.some(b => b.alive && b.x === a.x && b.y === a.y);
+  if (!shared && mat[i] === AIR || mat[i] === SMOKE || mat[i] === GRASS || mat[i] === SEED) set(i, cause === "burn_animal" ? ASH : SOIL, T[i]);
+}
+function tryStep(a, dx) {
+  const nx = a.x + dx; if (nx < 0 || nx >= W) { a.dir = -a.dir; return false; }
+  if (passable(mat[idx(nx, a.y)])) { a.x = nx; return true; }
+  for (let up = 1; up <= 2; up++) {   // step or jump up to two cells
+    if (a.y - up < 1 || !passable(mat[idx(a.x, a.y - up)])) break;
+    if (passable(mat[idx(nx, a.y - up)])) { a.x = nx; a.y -= up; return true; }
+  }
+  a.dir = -a.dir; return false;
+}
+function nearestAnimal(a, kind, range, dyMax) {
+  let best = null, bd = 1e9;
+  for (const b of animals) { if (!b.alive || b === a || b.kind !== kind) continue;
+    const dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y); if (dx > range || dy > dyMax) continue;
+    if (dx + dy < bd) { bd = dx + dy; best = b; } }
+  return best;
+}
+// Look sideways along the surface for a cell matching pred; returns the direction to it, or 0.
+function seek(a, pred, range) {
+  for (let d = 1; d <= range; d++) for (const s of [-1, 1]) { const X = a.x + s * d; if (X < 0 || X >= W) continue;
+    for (let j = -6; j <= 3; j++) { const Y = a.y + j; if (Y > 0 && Y < H && pred(mat[idx(X, Y)])) return s; } }
+  return 0;
+}
+function animalStep(a) {
+  const k = KIND[a.kind];
+  let i = idx(a.x, a.y), m = mat[i];
+  // Body: gravity, water, heat, being buried.
+  if (!passable(m)) {
+    if (P[m].phase === LIQUID) {
+      if (m === LAVA || m === MGLASS) return killAnimal(a, "burn_animal");
+      if (a.y > 1 && (passable(mat[i - W]) || mat[i - W] === WATER)) a.y--;
+      if (++a.drownT > 400) return killAnimal(a, "drown");
+    } else {   // something landed on it: climb out up or sideways, or suffocate after ~2 s trapped
+      if (a.y > 1 && passable(mat[i - W])) a.y--;
+      else if (a.x > 0 && passable(mat[i - 1])) a.x--;
+      else if (a.x < W - 1 && passable(mat[i + 1])) a.x++;
+      else if (++a.drownT > 120) return killAnimal(a, "buried");
+    }
+  } else {
+    a.drownT = Math.max(0, a.drownT - 2);
+    if (a.y + 1 < H && fallThrough(mat[i + W])) { a.y++; }
+  }
+  i = idx(a.x, a.y);
+  if (T[i] > 160 || hasNeighbor(a.x, a.y, n => n === EMBER || n === COAL_EMBER || n === LAVA) >= 0) return killAnimal(a, "burn_animal");
+  // Needs.
+  a.food -= k.drain; a.water -= k.thirst; a.age++; a.cool--;
+  if (a.food <= 0) return killAnimal(a, "starve", "hunger");
+  if (a.water <= 0) return killAnimal(a, "starve", "thirst");
+  if (a.age > a.maxAge) return killAnimal(a, "old_age");
+  // Drink from water or wet ground beside or below.
+  if (a.water < 75 && tick % 10 === 0) {
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, 1], [-1, 1], [1, 1]]) { const X = a.x + dx, Y = a.y + dy; if (X < 0 || X >= W || Y >= H) continue;
+      const q = idx(X, Y);
+      if (mat[q] === WATER) { a.water = Math.min(100, a.water + 30); moist[q] += 0.06; if (moist[q] >= 1) set(q, AIR, T[q]); ev("drink", q, T[q]); break; }
+      if (CAPA[mat[q]] > 0 && moist[q] / CAPA[mat[q]] > 0.4) { a.water = Math.min(100, a.water + 8); moist[q] -= 0.04; ev("drink", q, T[q]); break; }
+    }
+  }
+  // Grazers eat grass and low leaves near their head.
+  if (a.kind === GRAZER && a.food < 85 && tick % 12 === 0) {
+    outer: for (let dy = 0; dy >= -2; dy--) for (const dx of [0, a.dir, -a.dir]) { const X = a.x + dx, Y = a.y + dy; if (X < 0 || X >= W || Y < 0) continue;
+      const q = idx(X, Y), pm = mat[q];
+      if (pm === GRASS || (pm === PLANT && life[q] === 0)) { a.food = Math.min(100, a.food + (pm === GRASS ? 14 : 9)); a.ate = pm; set(q, AIR, T[q]);
+        if (pm === GRASS && q + W < N && mat[q + W] === GRASS) life[q + W] = 1;   // grazed grass regrows from below
+        ev("graze", q, T[q]); break outer; }
+    }
+    // Dung: after eating for a while, drop a seed of what was eaten, and enrich the ground below it.
+    if ((a.dung += 1) > 70) { const X = a.x - a.dir; a.dung = 0;
+      if (X >= 0 && X < W && mat[idx(X, a.y)] === AIR) { const q = idx(X, a.y); set(q, SEED, T[q]); age[q] = a.ate; ev("dung", q, T[q]);
+        const b = q + W; if (b < N && (mat[b] === SAND || mat[b] === DIRT) && rng() < 0.4) { const w = moist[b]; morph(b, SOIL); moist[b] = w; } } }
+  }
+  // Predators catch grazers next to them.
+  if (a.kind === PREDATOR && a.food < 60 && !(a.rest > 0)) {
+    const prey = nearestAnimal(a, GRAZER, 2, 2);
+    // A pounce often misses.
+    if (prey && tick % 6 === 0 && rng() < 0.4) { a.food = Math.min(100, a.food + 60); ev("hunt", idx(prey.x, prey.y), T[idx(prey.x, prey.y)]); prey.alive = false; deaths.hunted++; }
+  }
+  // Breed.
+  if (a.age > k.mature && a.cool <= 0 && a.food > k.breedFood && a.water > 50) {
+    const mate = nearestAnimal(a, a.kind, k.mateRange, 8);
+    // Crowding suppresses breeding: no young when too many of the same kind are close by.
+    let crowd = 0; for (const b of animals) if (b.alive && b.kind === a.kind && Math.abs(b.x - a.x) <= k.crowdR && Math.abs(b.y - a.y) <= 10) crowd++;
+    if (mate && mate.age > k.mature && crowd <= k.crowdMax) {
+      const bx = a.x - a.dir >= 0 && a.x - a.dir < W && passable(mat[idx(a.x - a.dir, a.y)]) ? a.x - a.dir : a.x;
+      if (spawnAnimal(a.kind, bx, a.y, 45)) { a.food -= k.birthCost; a.cool = k.cool; mate.cool = k.cool;
+        ev(a.kind === GRAZER ? "birth_grazer" : "birth_predator", i, T[i]); }
+    }
+  }
+  // Movement: flee, hunt, seek food or water, or wander.
+  let speed = k.walk, want = 0;
+  if (a.kind === GRAZER) {
+    const threat = nearestAnimal(a, PREDATOR, 12, 6);
+    if (threat) { want = threat.x > a.x ? -1 : 1; speed = k.run; }
+  } else if (a.rest > 0) { a.rest--; }
+  else if (a.food < 60) {
+    const prey = nearestAnimal(a, GRAZER, W, 30);   // hungry predators track grazers anywhere (by scent)
+    if (prey) {
+      const close = Math.abs(prey.x - a.x) < 14;
+      if (close && ++a.chase > 300) { a.chase = 0; a.rest = 600; }   // sprints tire it out: give up and rest
+      else { want = prey.x > a.x ? 1 : prey.x < a.x ? -1 : 0; speed = close ? k.run : k.walk; }
+    }
+  }
+  if (!want && (tick + a.phase) % 60 === 0) {
+    if (a.water < 45) a.seekT = seek(a, n => n === WATER, 50);
+    else if (a.kind === GRAZER && a.food < 65) a.seekT = seek(a, n => n === GRASS || n === PLANT, 30);
+    else a.seekT = 0;
+  }
+  if (!want) want = a.seekT;
+  if (want) a.dir = want;
+  else if (rng() < 0.01) a.dir = -a.dir;
+  if ((tick + a.phase) % speed === 0 && (want || rng() < 0.4)) tryStep(a, a.dir);
+}
+function animalsStep() {
+  for (const a of animals) if (a.alive) animalStep(a);
+  if (tick % 60 === 0) animals = animals.filter(a => a.alive);
+  if (tick % 120 === 0) recordPopulation();
+}
+// Population history for the ecosystem panel: one sample every 2 s, last 5 minutes.
+const POP_LEN = 150, popHist = { grazer: [], predator: [], grass: [] };
+function recordPopulation() {
+  let g = 0, p = 0, gr = 0;
+  for (const a of animals) if (a.alive) { if (a.kind === GRAZER) g++; else p++; }
+  for (let i = 0; i < N; i++) if (mat[i] === GRASS) gr++;
+  for (const [k, v] of [["grazer", g], ["predator", p], ["grass", gr]]) { popHist[k].push(v); if (popHist[k].length > POP_LEN) popHist[k].shift(); }
+}
+
 // ---------- Rocks ----------
 // Water in buried sediment is squeezed out upward when it turns to rock.
 function squeeze(x, y, i) {
@@ -786,6 +971,7 @@ function step() {
   heatStep();
   rainBin();
   runRecipes();
+  animalsStep();
   tick++;
 }
 
@@ -830,9 +1016,10 @@ function generate() {
       T[i] = Math.max(T[i], 900 - (d - 1) * 900); } }
   // Starting humidity: half-saturated air; dirt starts a little damp, sand dry
   for (let i = 0; i < N; i++) { if (mat[i] === AIR) moist[i] = 0.5 * sat(T[i]); else if (mat[i] === DIRT) moist[i] = 0.15; }
-  // Grass on the hills between the pond and the mountain
-  for (let x = 130; x < 172; x++) { const g = ground(x); if (rng() < 0.6 && mat[idx(x, g - 1)] === AIR && mat[idx(x, g)] === DIRT) {
-    const q = idx(x, g - 1); set(q, GRASS, 20); age[q] = 1000; } }
+  // Grass across the dirt hills and valley (not the desert, pond or mountain)
+  for (let x = 44; x < 190; x++) { if (x > 52 && x < 82) continue;   // leave a firebreak around the campfire
+    const g = ground(x); if (rng() < 0.8 && mat[idx(x, g - 1)] === AIR && mat[idx(x, g)] === DIRT) {
+    const q = idx(x, g - 1); set(q, GRASS, 20); age[q] = 1000; life[q] = rng() < 0.5 ? 1 : 0; } }
   // The desert: two old cacti, and dormant seeds buried in the surface sand that wait for water
   for (const cx of [12, 30]) { const g = ground(cx); for (let k = 1; k <= 3; k++) { const q = idx(cx, g - k); set(q, CACTUS, 20); age[q] = 1000; }
     moist[idx(cx, g)] = 0.03; }
@@ -848,6 +1035,9 @@ function generate() {
   for (const dx of [-1, 0, 1]) set(idx(cf + dx, cg - 1), WOOD, 20);
   set(idx(cf, cg - 2), EMBER, 600); life[idx(cf, cg - 2)] = 400;
   for (let x = cf + 2; x < 74; x++) { const g = ground(x); if (mat[idx(x, g - 1)] === AIR) { set(idx(x, g - 1), GRASS, 20); age[idx(x, g - 1)] = 2000; } }
+  animals = []; for (const k in popHist) popHist[k].length = 0; for (const k in deaths) deaths[k] = 0;
+  for (let n = 0; n < 12; n++) { const x = 84 + n * 8 + (rng() * 4 | 0); if (x < 92 || x > 128) spawnAnimal(GRAZER, x, ground(x) - 1, 75); }
+  for (const x of [150, 176]) spawnAnimal(PREDATOR, x, ground(x) - 1, 100);
   tick = 0; computeLoad();
 }
 
@@ -888,12 +1078,17 @@ function render() {
     }
     px[o] = r; px[o + 1] = g; px[o + 2] = b; px[o + 3] = 255;
   }
+  for (const a of animals) { if (!a.alive) continue; const k = KIND[a.kind];
+    const put = (x, y, c) => { if (x < 0 || x >= W || y < 0 || y >= H) return; const o = (y * W + x) * 4; px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; };
+    // A three-pixel silhouette: body and back in the body colour, head raised in front (predators' head is an eye-glint).
+    put(a.x, a.y, k.col); put(a.x - a.dir, a.y, k.col); put(a.x + a.dir, a.y - 1, k.head); }
   ctx.putImageData(img, 0, 0);
 }
 
 // ---------- Interaction ----------
 const BASE_PALETTE = [STONE, SAND, DIRT, CLAY, WATER, WOOD, SEED, ORE];
 const UNLOCKABLE = [ICE, STEAM, MUD, ASH, CHARCOAL, GLASS, BRICK, METAL, SOIL];
+let animalKind = GRAZER;
 let palette = new Set(BASE_PALETTE), paintMat = SAND, tool = "paint", brush = 2, down = false, lastCell = null;
 const newMats = new Set();
 let discTimer = 0;
@@ -917,6 +1112,12 @@ function drawPalette() {
     const b = document.createElement("button"); b.className = "swatch" + (m === paintMat && tool === "paint" ? " on" : "");
     b.innerHTML = `<i style="background:rgb(${P[m].col})"></i>${P[m].name}${newMats.has(m) ? ' <span class="newb">NEW</span>' : ""}`;
     b.onclick = () => { paintMat = m; newMats.delete(m); setTool("paint"); };
+    el.appendChild(b);
+  }
+  for (const kd of [GRAZER, PREDATOR]) {
+    const b = document.createElement("button"); b.className = "swatch" + (tool === "animal" && animalKind === kd ? " on" : "");
+    b.innerHTML = `<i style="background:rgb(${KIND[kd].col})"></i>Place ${KIND[kd].name.toLowerCase()}`;
+    b.onclick = () => { animalKind = kd; setTool("animal"); };
     el.appendChild(b);
   }
 }
@@ -947,7 +1148,10 @@ function applyBrush(cx, cy, t, m, r, record = true) {
 function cellFromEvent(e) { const r = cv.getBoundingClientRect();
   return [Math.floor((e.clientX - r.left) / r.width * W), Math.floor((e.clientY - r.top) / r.height * H)]; }
 cv.addEventListener("pointerdown", e => { cv.setPointerCapture(e.pointerId); down = true; lastCell = cellFromEvent(e);
-  if (pendingRun) { startRun(pendingRun, ...lastCell); pendingRun = null; down = false; } });
+  if (pendingRun) { startRun(pendingRun, ...lastCell); pendingRun = null; down = false; return; }
+  if (tool === "animal") { down = false; const [x, y] = lastCell;
+    if (spawnAnimal(animalKind, x, y, 75)) { markTouched(x, y); metrics.animalsPlaced = (metrics.animalsPlaced || 0) + 1; }
+    else toast("Animals need open air to stand in, and there's a limit of " + MAX_ANIMALS + "."); } });
 let tipX = 0, tipY = 0;
 cv.addEventListener("pointermove", e => { lastCell = cellFromEvent(e); const [x, y] = lastCell; hoverI = (x >= 0 && y >= 0 && x < W && y < H) ? idx(x, y) : -1;
   const r = cv.getBoundingClientRect(); tipX = e.clientX - r.left; tipY = e.clientY - r.top; });
@@ -1004,6 +1208,10 @@ function drawTip() {
   const el = document.getElementById("tip");
   if (hoverI < 0) { el.hidden = true; return; }
   const y = hoverI / W | 0, alt = 80 - y;
+  const hx = hoverI % W, an = animals.find(a => a.alive && Math.abs(a.x - hx) <= 1 && Math.abs(a.y - y) <= 1);
+  if (an) { el.innerHTML = `<b>${KIND[an.kind].name}</b> <span class="alt">· food ${Math.round(an.food)}% · water ${Math.round(an.water)}% · age ${Math.round(an.age / 60)} s${an.age > KIND[an.kind].mature ? "" : " (young)"}</span>`;
+    el.hidden = false; el.style.left = `${tipX}px`; el.style.top = `${tipY}px`;
+    el.style.transform = tipX > cv.clientWidth - 200 ? "translate(calc(-100% - 14px), 14px)" : "translate(14px, 14px)"; return; }
   const m = mat[hoverI], cp = CAPA[m];
   const soilTxt = cp > 0 ? ` · water ${Math.round(100 * moist[hoverI] / cp)}%` : SPECIES[m] ? (moist[hoverI] > SPECIES[m].thirst * 0.3 ? " · thirsty" : " · watered") : "";
   const rockTxt = P[m].phase === SOLID || P[m].phase === POWDER ? ` · load ${Math.round(load[hoverI])}` : "";
@@ -1144,9 +1352,9 @@ function drawSnaps() {
   const el = document.getElementById("snaps"); el.innerHTML = "";
   snaps.forEach((s, n) => {
     const a = document.createElement("button"); a.textContent = `Save ${n + 1}`;
-    a.onclick = () => { snaps[n] = { mat: mat.slice(), T: T.slice(), life: life.slice(), age: age.slice(), shade: shade.slice(), moist: moist.slice(), at: secs() }; metrics.snapshotsSaved++; drawSnaps(); };
+    a.onclick = () => { snaps[n] = { mat: mat.slice(), T: T.slice(), life: life.slice(), age: age.slice(), shade: shade.slice(), moist: moist.slice(), animals: animals.filter(a => a.alive).map(a => ({ ...a })), at: secs() }; metrics.snapshotsSaved++; drawSnaps(); };
     const b = document.createElement("button"); b.textContent = s ? `Load ${n + 1} (${s.at}s)` : `Load ${n + 1}`; b.disabled = !s;
-    b.onclick = () => { mat.set(s.mat); T.set(s.T); life.set(s.life); age.set(s.age); shade.set(s.shade); moist.set(s.moist); metrics.snapshotsLoaded++; };
+    b.onclick = () => { mat.set(s.mat); T.set(s.T); life.set(s.life); age.set(s.age); shade.set(s.shade); moist.set(s.moist); animals = s.animals.map(a => ({ ...a })); metrics.snapshotsLoaded++; };
     el.append(a, b);
   });
 }
@@ -1190,6 +1398,19 @@ function drawJournal() {
     }
     goals.appendChild(row);
   }
+  const ah = document.createElement("div"); ah.className = "small"; ah.style.marginTop = "6px"; ah.textContent = "Animals"; goals.appendChild(ah);
+  for (const [id, label, hints] of ANIMAL_GOALS) {
+    const done = RX[RXI[id]].first !== null, key = "A" + id, lv = hintLevel[key] || 0, row = document.createElement("div");
+    row.className = "goalrow" + (done ? " done" : "");
+    row.innerHTML = done ? `✓ ${label}` : `<span class="unknown"></span>Not yet seen: ${label.toLowerCase()}`;
+    if (!done) {
+      const b = document.createElement("button"); b.className = "small"; b.textContent = lv === 0 ? "Hint" : lv < 3 ? "Another hint" : "No more hints";
+      b.disabled = lv >= 3; b.onclick = () => { hintLevel[key] = lv + 1; metrics.hints = (metrics.hints || 0) + 1; drawJournal(); };
+      row.appendChild(b);
+      if (lv > 0) { const h = document.createElement("div"); h.className = "hint"; h.textContent = hints.slice(0, lv).join(" "); row.appendChild(h); }
+    }
+    goals.appendChild(row);
+  }
   const lh = document.createElement("div"); lh.className = "small"; lh.style.marginTop = "6px"; lh.textContent = "Living things"; goals.appendChild(lh);
   for (const m of LIVING) {
     const done = RX[RXI[SPROUT_ID[m]]].first !== null, key = "L" + m, lv = hintLevel[key] || 0, row = document.createElement("div");
@@ -1204,6 +1425,40 @@ function drawJournal() {
     goals.appendChild(row);
   }
   journalDirty = false;
+}
+const sparkHover = {};
+for (const k of ["grazer", "predator", "grass"]) {
+  const c = document.getElementById("spark-" + k);
+  c.addEventListener("pointermove", e => { const r = c.getBoundingClientRect(); sparkHover[k] = (e.clientX - r.left) / r.width; drawEcosystem(); });
+  c.addEventListener("pointerleave", () => { delete sparkHover[k]; drawEcosystem(); });
+}
+function drawEcosystem() {
+  document.getElementById("deathlog").textContent = "Deaths so far: " + Object.entries(deaths).filter(([, v]) => v).map(([k, v]) => `${k.replace("_", " ")} ${v}`).join(" · ");
+  const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue("--ink").trim(),
+        accent = css.getPropertyValue("--accent").trim(), line = css.getPropertyValue("--line").trim(), muted = css.getPropertyValue("--muted").trim();
+  for (const k of ["grazer", "predator", "grass"]) {
+    const h = popHist[k], c = document.getElementById("spark-" + k), g = c.getContext("2d"), dpr = window.devicePixelRatio || 1;
+    const w = Math.round(c.clientWidth * dpr), ht = Math.round(c.clientHeight * dpr);
+    if (c.width !== w || c.height !== ht) { c.width = w; c.height = ht; }
+    g.clearRect(0, 0, w, ht);
+    const head = document.getElementById("pop-" + k);
+    head.textContent = h.length ? `${h[h.length - 1]}` : "0";
+    g.fillStyle = line; g.fillRect(0, ht - dpr, w, dpr);   // baseline at zero
+    if (h.length < 2) continue;
+    const max = Math.max(1, ...h), pad = 4 * dpr, X = n => (n / (POP_LEN - 1)) * w, Y = v => ht - dpr - (v / max) * (ht - pad - dpr);
+    const x0 = w - X(h.length - 1);
+    g.strokeStyle = accent; g.lineWidth = 2 * dpr; g.lineJoin = "round"; g.beginPath();
+    h.forEach((v, n) => { const px2 = x0 + X(n), py = Y(v); n ? g.lineTo(px2, py) : g.moveTo(px2, py); }); g.stroke();
+    g.fillStyle = accent; g.beginPath(); g.arc(x0 + X(h.length - 1), Y(h[h.length - 1]), 3 * dpr, 0, Math.PI * 2); g.fill();
+    head.textContent = `${h[h.length - 1]}  (peak ${max})`;
+    if (sparkHover[k] !== undefined) {   // hover: a guide line, and the value at that moment in the header
+      const n = Math.round((sparkHover[k] * w - x0) / w * (POP_LEN - 1)); if (n < 0 || n >= h.length) continue;
+      const hx = x0 + X(n), ago = (h.length - 1 - n) * 2;
+      g.fillStyle = muted; g.fillRect(hx, 0, dpr, ht);
+      g.fillStyle = ink; g.beginPath(); g.arc(hx, Y(h[n]), 3 * dpr, 0, Math.PI * 2); g.fill();
+      head.textContent = `${h[n]} · ${ago} s ago`;
+    }
+  }
 }
 function drawClimate() {
   rainTotals();
@@ -1295,10 +1550,10 @@ function loop(now) {
   drawStatus();
   if (discTimer > 0 && --discTimer === 0) document.getElementById("disc").hidden = true;
   document.getElementById("savelast").disabled = !lastProduct;
-  if (++uiTick % 15 === 0) { if (journalDirty) drawJournal(); drawMetrics(); drawClimate(); }
+  if (++uiTick % 15 === 0) { if (journalDirty) drawJournal(); drawMetrics(); drawClimate(); drawEcosystem(); }
   requestAnimationFrame(loop);
 }
-window.WORLD = { load, ROCKS, recipes: () => recipes, saveLastAsRecipe, lastProduct: () => lastProduct, startRun: (r, x, y) => startRun(r, x, y), step, mat, T, P, RX, moist, life, age, climate, sat, rainTotals, CAPA, C: () => C, energy, metrics, applyBrush, idx, generate, M: { AIR, STONE, SAND, DIRT, MUD, SOIL, SEED, GRASS, CACTUS, ASH, WATER, WOOD, CHARCOAL, ORE, METAL, GLASS, CLAY, BRICK, PLANT, STEAM, ICE, LAVA }, setSeed: s => { seed = s; } };
+window.WORLD = { deaths, animals: () => animals, popHist, spawnAnimal, GRAZER, PREDATOR, load, ROCKS, recipes: () => recipes, saveLastAsRecipe, lastProduct: () => lastProduct, startRun: (r, x, y) => startRun(r, x, y), step, mat, T, P, RX, moist, life, age, climate, sat, rainTotals, CAPA, C: () => C, energy, metrics, applyBrush, idx, generate, M: { AIR, STONE, SAND, DIRT, MUD, SOIL, SEED, GRASS, CACTUS, ASH, WATER, WOOD, CHARCOAL, ORE, METAL, GLASS, CLAY, BRICK, PLANT, STEAM, ICE, LAVA }, setSeed: s => { seed = s; } };
 drawSnaps(); drawLegend(); newWorld();
 requestAnimationFrame(loop);
 </script>

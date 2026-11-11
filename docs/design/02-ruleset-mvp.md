@@ -36,6 +36,10 @@ This is the smallest set I think still produces interesting combinations. Every 
 | P13 | **Pressure** (the weight of everything above a cell) | Burial, compaction, metamorphism | Sand under about 8 cells of material presses into sandstone; mud and clay into shale |
 | P14 | **Cooling environment** (open air, water or sealed rock decides how fast lava cools) | Which igneous rock forms | Water-quenched lava → obsidian; open air → basalt; sealed underground → granite |
 
+| P15 | **Animals** (agents with food, water and age; they eat, drink, breed, flee or hunt, and die) | Population dynamics, grazing pressure, seed spreading | Grazers boom on lush grass and overgraze it; predators follow grazer numbers up and down; dung spreads seeds and enriches the ground |
+
+P15 was added in v0.6 (animals), following D15 (the earth-system sandbox is the core experience).
+
 The rock cycle closes: weathering by water and ice → sediment → burial → sedimentary rock → heat under load (sandstone → quartzite above about 500°, shale → slate above about 300°) → melting → lava → igneous rock. P13 and P14 were added in v0.5 (geology).
 
 P9 and P10 were added in prototype v0.3 (2026-10-20), after playtest 01 asked how mountains, forests and deserts shape the climate. Water is conserved through the whole cycle: ocean inflow, evaporation, plants releasing vapour, cloud, rain, soaking into soil, and drying out. Raindrops can be partial cells, and they merge when they touch. P11 and P12 were added in v0.4 (plants and soil), after playtest 04: "plants are fun, let's do more".

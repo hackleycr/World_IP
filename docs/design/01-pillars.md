@@ -20,6 +20,7 @@ Status: draft, updated 2026-10-20 with research findings. See the decision log (
 | D12 | Team, engine, platform | Deferred until more research is done. The throwaway prototype is built in the browser (HTML canvas + JavaScript) because it is quickest to build and share; this does not decide the production engine. |
 | D13 | Design rules from research | Adopt the design rules in section 2a as working requirements. Each rule is backed by [02-gameplay-loops-findings.md](../research/02-gameplay-loops-findings.md) and [03-review-mining-findings.md](../research/03-review-mining-findings.md), and each has a metric to test in the prototype. |
 | D14 | Preservation and sharing | Saving snapshots of past world states and sharing recipes move from "placeholder" into the MVP, because the research ties both directly to Pillars 1–3 (see R9 and R14). |
+| D15 | Core experience | **The earth-system sandbox (weather, water, plants, rocks, animals) is the core of the game; the crafting chain (charcoal, glass, metal) is secondary.** Evidence: in playtests 04–06 the player skipped the fire chain entirely and spent their time on climate, plants and geology; the longest session (8.4 min) came with plants. The player confirmed this on 2026-11-11. New work should deepen the interacting natural systems first. |
 
 ## 1. The pillars, as stated
 

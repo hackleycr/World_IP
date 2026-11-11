@@ -1,6 +1,6 @@
 # Prototype 0 — "Is discovery fun?"
 
-Status: v0.5 (recipes fixed, geology) built 2026-10-21 after playtests [01 and 02](../playtests/2026-10-20-playtest-01.md) — [prototype/index.html](../../prototype/index.html). Throwaway: it exists to answer one question, and its code is not the production base (D12).
+Status: v0.6 (animals) built 2026-11-11 after playtests [01 and 02](../playtests/2026-10-20-playtest-01.md) — [prototype/index.html](../../prototype/index.html). Throwaway: it exists to answer one question, and its code is not the production base (D12).
 
 ## The question
 
@@ -50,6 +50,19 @@ Status: v0.5 (recipes fixed, geology) built 2026-10-21 after playtests [01 and 0
 | v0.4 | **Plants and soil:** water soaks into and drains through ground (sand, dirt, soil, mud); three species (grass, cactus, tree) with different water needs, chosen by where a seed lands; plants spread seeds downwind, drink from their roots, wilt, drown, and rot into **soil**; roots and ash turn sand or dirt into soil (succession); dormant seeds in the desert; wild seeds blowing in; the water view shows ground moisture; a "Living things" goal list with hints. Rain gauge is a rolling 60 s window with a Reset button | Playtest 04: "plants are fun, let's do more"; the gauge kept stale data |
 
 | v0.5 | **Recipes:** working backwards now keeps only strokes that landed on or within 5 cells of the cells actually made; runs of the same stroke merge into one step with a duration (held torch = 1 step); only results that take real work offer a save (charcoal, glass, brick, metal, ice, soil, rocks). **Geology:** a pressure field (the weight above each cell); seven rocks (sandstone, shale, basalt, granite, obsidian, quartzite, slate) formed by burial, cooling environment, and heat under load; weathering by water and freeze–thaw; exposed lava radiates and flash-boils water; tooltip shows load; Discoveries panel groups materials, rocks and living things | Playtest 05: the "Make ash" recipe had 253 steps and was never run; the player asked for recipes first, then geology |
+
+| v0.6 | **Animals:** grazers (eat grass and low leaves, drink, breed when well fed and not crowded, flee predators; dung drops a seed of what they ate and enriches the ground) and predators (track hungry over the whole map, sprint, tire and rest, pounces often miss, breed slowly). Deaths from hunger, thirst, old age, being hunted, drowning, fire and burial; bodies rot into soil. A place-animal tool, an animal tooltip, an Ecosystem panel with population charts for grazers, predators and grass, and a death tally. Also: grass carpets the hills and regrows from below when grazed, and a firebreak surrounds the campfire | Playtest 06 and decision D15: the player is drawn to the earth-system sandbox; "animals sounds fun" |
+
+**Verified headlessly for v0.6:**
+- Across three random 12-minute worlds, the populations cycle. One example: grazers 19 → 60 → 34 → 20 → 46 → 31 → 9, while predators rose from 3 to 9.
+- Two of the three worlds ended in extinction at 11–12 minutes, after grass collapsed from overgrazing in the dry valley. Keeping all three alive is left as a player challenge.
+- Regression checks pass: charcoal, ice, recipe trimming and replay, and the lava rocks. A step takes 2.3–2.9 ms, with no errors.
+- Bugs found and fixed while tuning:
+  - grazers trapped behind tree trunks
+  - stacked newborns moving in lockstep
+  - bodies burying their neighbours
+  - animals spawning on the campfire
+  - predators hunting from the first second
 
 **Verified headlessly for v0.5:**
 - A charcoal kiln built amid unrelated strokes gives a 26-step recipe (25 paint strokes plus 1 torch step) instead of hundreds, and replaying it elsewhere makes charcoal.
